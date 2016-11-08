@@ -2,7 +2,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from netlearner.utils import accuracy, measure_prediction, standard_scale
-from netlearner.autoencoder import Autoencoder
+from netlearner.autoencoder import SparseAutoencoder
 from netlearner.multilayer_perceptron import MultilayerPerceptron
 
 
@@ -25,10 +25,11 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 feature_size = train_dataset.shape[1]
 num_labels = train_labels.shape[1]
-encoder_size = 64
+encoder_size = 200
 encoder_lr = 0.1
-beta = 0.0001
-autoencoder = Autoencoder(feature_size, encoder_size, encoder_lr, beta=beta)
+beta = 0.001
+autoencoder = SparseAutoencoder(feature_size,
+                                encoder_size, encoder_lr, beta=beta)
 batch_size = 8000
 num_steps = 1000
 autoencoder.train(train_dataset, batch_size, num_steps)
@@ -37,14 +38,14 @@ print("Testset decode loss: %f" % test_loss)
 encoded_train_dataset = autoencoder.encode_dataset(train_dataset)
 encoded_valid_dataset = autoencoder.encode_dataset(valid_dataset)
 encoded_test_dataset = autoencoder.encode_dataset(test_dataset)
-print('Encoded training set', encoded_train_dataset.shape, train_labels.shape)
-print('Encoded validation set', encoded_valid_dataset.shape, valid_labels.shape)
+print('Encoded train set', encoded_train_dataset.shape, train_labels.shape)
+print('Encoded valid set', encoded_valid_dataset.shape, valid_labels.shape)
 print('Encoded test set', encoded_test_dataset.shape, test_labels.shape)
 # use encoded traning and testing data
 num_samples = encoded_train_dataset.shape[0]
 feature_size = encoded_train_dataset.shape[1]
 num_labels = train_labels.shape[1]
-hidden_layer_sizes = [200]
+hidden_layer_sizes = [128]
 mp_classifier = MultilayerPerceptron(feature_size,
                                      hidden_layer_sizes, num_labels,
                                      trans_func=tf.nn.sigmoid,
