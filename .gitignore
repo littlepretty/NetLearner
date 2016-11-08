@@ -1,0 +1,6 @@
+*.pyc
+build
+dist
+netleaner.egg-info
+.ipyne_checkpoints
+
