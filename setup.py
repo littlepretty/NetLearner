@@ -14,6 +14,7 @@ setup(name='netlearner',
           'tabulate',
           'matplotlib',
           'numpy',
+          'sklearn',
           'tensorflow'
       ],
       zip_safe=False)
