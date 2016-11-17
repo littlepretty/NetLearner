@@ -4,7 +4,8 @@ from __future__ import print_function
 import csv
 import os
 import numpy as np
-from sklearn import preprocessing
+from sklearn.preprocessing import OneHotEncoder
+# import argparse
 
 # ### Convert/Define Symbolic String to Int
 #
@@ -14,54 +15,34 @@ from sklearn import preprocessing
 # 2. services
 # 3. flag
 # 4. attack
-#
 
-# In[55]:
-
-
-def load_feature_maps(files=['traindata', 'testdata']):
-    protocol_map = {}
-    service_map = {}
-    flag_map = {}
-    attack_map = {}
-    for datafile in files:
-        filename = 'data/kddcup.' + datafile
-        with open(filename, 'rb') as csv_file:
-            reader = csv.reader(csv_file, delimiter=',')
-            for row in reader:
-                if row[1] not in protocol_map:
-                    protocol_map[row[1]] = len(protocol_map)
-                if row[2] not in service_map:
-                    service_map[row[2]] = len(service_map)
-                if row[3] not in flag_map:
-                    flag_map[row[3]] = len(flag_map)
-                if row[-1][:-1] not in attack_map:
-                    attack_map[row[-1][:-1]] = len(attack_map)
-    return protocol_map, service_map, flag_map, attack_map
-
-
-feature_size = 41
+raw_feature_size = 41
 # NOTE: should use consistent maps defined below
-protocol_map = {'udp': 1, 'icmp': 2, 'tcp': 0}
-service_map = {'urp_i': 11, 'netbios_ssn': 51, 'Z39_50': 40, 'tim_i': 68,
-               'smtp': 1, 'domain': 22, 'private': 12, 'echo': 18,
-               'printer': 50, 'red_i': 69, 'eco_i': 6, 'sunrpc': 43,
-               'ftp_data': 14, 'urh_i': 62, 'pm_dump': 38, 'pop_3': 13,
-               'pop_2': 52, 'systat': 30, 'ftp': 7, 'uucp': 37, 'whois': 21,
-               'tftp_u': 66, 'netbios_dgm': 41, 'efs': 54, 'remote_job': 25,
-               'sql_net': 57, 'daytime': 16, 'ntp_u': 8, 'finger': 4,
-               'ldap': 42, 'netbios_ns': 60, 'kshell': 61, 'iso_tsap': 59,
-               'ecr_i': 9, 'nntp': 36, 'http_2784': 63, 'shell': 33,
-               'domain_u': 2, 'uucp_path': 56, 'courier': 44, 'exec': 45,
-               'aol': 65, 'netstat': 15, 'telnet': 5, 'gopher': 24, 'rje': 26,
-               'hostnames': 55, 'link': 29, 'ssh': 17, 'http_443': 48,
-               'csnet_ns': 47, 'X11': 32, 'IRC': 39, 'harvest': 64,
-               'imap4': 35, 'icmp': 70, 'supdup': 28, 'name': 20, 'nnsp': 53,
-               'mtp': 23, 'http': 0, 'bgp': 46, 'ctf': 27, 'klogin': 49,
-               'vmnet': 58, 'time': 19, 'discard': 31, 'login': 34, 'auth': 3,
-               'other': 10, 'http_8001': 67}
-flag_map = {'OTH': 4, 'RSTR': 8, 'S3': 3, 'S2': 1, 'S1': 2, 'S0': 7,
-            'RSTOS0': 9, 'REJ': 5, 'SH': 10, 'RSTO': 6, 'SF': 0}
+protocol_types = {'udp': 1, 'icmp': 2, 'tcp': 0}
+service_types = {'urp_i': 11, 'netbios_ssn': 51, 'Z39_50': 40, 'tim_i': 68,
+                 'smtp': 1, 'domain': 22, 'private': 12, 'echo': 18,
+                 'printer': 50, 'red_i': 69, 'eco_i': 6, 'sunrpc': 43,
+                 'ftp_data': 14, 'urh_i': 62, 'pm_dump': 38, 'pop_3': 13,
+                 'pop_2': 52, 'systat': 30, 'ftp': 7, 'uucp': 37, 'whois': 21,
+                 'tftp_u': 66, 'netbios_dgm': 41, 'efs': 54, 'remote_job': 25,
+                 'sql_net': 57, 'daytime': 16, 'ntp_u': 8, 'finger': 4,
+                 'ldap': 42, 'netbios_ns': 60, 'kshell': 61, 'iso_tsap': 59,
+                 'ecr_i': 9, 'nntp': 36, 'http_2784': 63, 'shell': 33,
+                 'domain_u': 2, 'uucp_path': 56, 'courier': 44, 'exec': 45,
+                 'aol': 65, 'netstat': 15, 'telnet': 5, 'gopher': 24,
+                 'rje': 26, 'hostnames': 55, 'link': 29, 'ssh': 17,
+                 'http_443': 48, 'csnet_ns': 47, 'X11': 32, 'IRC': 39,
+                 'harvest': 64, 'imap4': 35, 'icmp': 70, 'supdup': 28,
+                 'name': 20, 'nnsp': 53, 'mtp': 23, 'http': 0, 'bgp': 46,
+                 'ctf': 27, 'klogin': 49, 'vmnet': 58, 'time': 19,
+                 'discard': 31, 'login': 34, 'auth': 3, 'other': 10,
+                 'http_8001': 67}
+flag_types = {'OTH': 4, 'RSTR': 8, 'S3': 3, 'S2': 1, 'S1': 2, 'S0': 7,
+              'RSTOS0': 9, 'REJ': 5, 'SH': 10, 'RSTO': 6, 'SF': 0}
+land_types = {'1': 1, '0': 0}
+login_types = {'1': 0, '0': 1}
+host_login_types = {'1': 1, '0': 0}
+guest_login_types = {'1': 1, '0': 0}
 attack_map = {'guess_passwd': 6, 'spy': 21, 'named': 24, 'ftp_write': 12,
               'processtable': 33, 'nmap': 17, 'back': 13, 'multihop': 18,
               'rootkit': 22, 'udpstorm': 30, 'snmpguess': 39, 'pod': 7,
@@ -72,21 +53,12 @@ attack_map = {'guess_passwd': 6, 'spy': 21, 'named': 24, 'ftp_write': 12,
               'mscan': 32, 'saint': 28, 'normal': 0, 'xterm': 31, 'phf': 16,
               'warezmaster': 19, 'imap': 14, 'warezclient': 20, 'land': 11,
               'neptune': 4, 'worm': 36, 'xlock': 25, 'smurf': 5, 'xsnoop': 26}
-print(len(protocol_map), 'protocol types')
-print(len(service_map), 'service types')
-print(len(flag_map), 'flag types')
-print(len(attack_map), 'attack types')
-# print(len(protocol_map), 'protocol types: ', protocol_map)
-# print(len(service_map), 'service types: ', service_map)
-# print(len(flag_map), 'flag types: ', flag_map)
-# print(len(attack_map), 'attack types: ', attack_map)
 
 
 # ### Convert Attack to Int
 # Process other data files according to the maps defined above.
 # There are total 23 types of attacks. But we will further map these attacks
 # to 4 categories, or even just a binary(attack, nonattack).
-#
 attack_category_map = {'normal': 'normal', 'back': 'dos',
                        'buffer_overflow': 'u2r',
                        'ftp_write': 'r2l', 'guess_passwd': 'r2l', 'imap': 'r2l',
@@ -155,15 +127,18 @@ attack_category_map = {'normal': 'normal', 'back': 'dos',
                        'saint': 'probe',
                        'satan': 'probe',
                        'secret': 'data',
-                       'sqlattack': 'other',
-                       'worm': 'other'}
+                       'sqlattack': 'probe',
+                       'worm': 'probe'}
 # If category_map[x] != 0, then x is a type of attack
 category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
-num_classes = len(category_map)
-print(num_classes, ' classes of traffics')
+binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
+enc = OneHotEncoder(n_values=[len(protocol_types),
+                              len(service_types),
+                              len(flag_types)])
+encoder_fitted = False
 
 
-def load_traffic(filename, show=6):
+def load_traffic_less_dim(filename, traffic_map=category_map, show=6):
     """Each row  of all_traffic is a traffic record"""
     all_traffics = list()
     with open(filename, 'rb') as csv_file:
@@ -171,25 +146,76 @@ def load_traffic(filename, show=6):
         seen = set()
         for row in reader:
             try:
-                # Skip the a constant-valued feature
+                # Ignore difficulty level and 19th feature,
+                # which is a constant zero
                 traffic = row[0:19] + row[20:]
-                traffic[1] = protocol_map[row[1]]
-                traffic[2] = service_map[row[2]]
-                traffic[3] = flag_map[row[3]]
-                attack = row[-1][:-1]
+                traffic[1] = protocol_types[row[1]]
+                traffic[2] = service_types[row[2]]
+                traffic[3] = flag_types[row[3]]
+                attack = row[-1]
 
                 category = attack_category_map[attack]
-                traffic[-1] = category_map[category]
+                traffic[-1] = traffic_map[category]
                 traffic = [float(r) for r in traffic]
                 all_traffics.append(traffic)
                 if category not in seen and show > 0:
                     print(category, ' traffic')
                     show -= 1
                     seen.add(category)
-            except KeyError:
-                print('Cannot parse record %s' % row)
+            except KeyError as e:
+                print('Cannot parse record %s:', e)
 
     return np.array(all_traffics)
+
+
+def load_traffic(filename, traffic_map=category_map, show=6):
+    """Each row  of all_traffic is a traffic record"""
+    global encoder_fitted
+    numerical_features = list()
+    symbolic_features = list()
+    labels = list()
+
+    with open(filename, 'rb') as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        seen = set()
+        for row in reader:
+            try:
+                # Ignore the 19th feature, which is a constant zero
+                attack = row[-1][:-1]
+                row[1] = protocol_types[row[1]]
+                row[2] = service_types[row[2]]
+                row[3] = flag_types[row[3]]
+
+                numerical_features.append(row[0:1] + row[4:19] + row[20:-1])
+                symbolic_features.append(row[1:4])
+
+                category = attack_category_map[attack]
+                labels.append(traffic_map[category])
+
+                if category not in seen and show > 0:
+                    print(category, ' traffic')
+                    show -= 1
+                    seen.add(category)
+            except KeyError as e:
+                print('Cannot parse record %s:', e)
+
+    part1 = np.array(numerical_features, dtype=float)
+
+    if encoder_fitted is False:
+        enc.fit(symbolic_features)
+        encoder_fitted = True
+
+    encoded = enc.transform(symbolic_features).toarray()
+    print('One-Hot Encoded symbolic features: ', encoded.shape)
+    part2 = np.array(encoded, dtype=float)
+    all_traffics = np.concatenate((part1, part2), axis=1)
+
+    labels = np.array(labels, dtype=int)[np.newaxis]
+    labels = labels.T
+    all_traffics = np.concatenate((all_traffics, labels), axis=1)
+
+    print('Traffic data: ', all_traffics.shape)
+    return all_traffics
 
 
 def one_hot_encoding(labels):
@@ -199,17 +225,6 @@ def one_hot_encoding(labels):
     for [i, l] in enumerate(labels):
         encoding[i, int(l)] = 1.0
     return encoding
-
-
-def mean_normalize(matrix):
-    print(matrix[:, 19])
-    print(matrix[:, 20])
-
-    for i in range(matrix.shape[1]):
-        mu = np.mean(matrix[:, i])
-        sigma = np.std(matrix[:, i])
-        matrix[:, i] = (matrix[:, i] - mu) / sigma
-    return matrix
 
 
 def shuffle_dataset_with_label(matrix, contain_label=True):
@@ -223,23 +238,11 @@ def shuffle_dataset_with_label(matrix, contain_label=True):
         dataset = matrix[:, :-1]
         labels = matrix[:, -1]
 
-        print('Mean normalize dataset...')
-        dataset = preprocessing.scale(dataset)
-        print(dataset.mean(axis=0))
-        print(dataset.std(axis=0))
-        print(dataset[np.random.randint(0, dataset.shape[0]), :])
-
         print('Convert label to one-hot-encoding...')
         labels = one_hot_encoding(labels)
         print(labels[:4, :])
-
         return dataset, labels
     else:
-        print('Mean normalize dataset...')
-        matrix = preprocessing.scale(matrix)
-        print(matrix.mean(axis=0))
-        print(matrix.std(axis=0))
-
         return matrix, None
 
 
@@ -258,7 +261,7 @@ def maybe_npsave(dataname, data, l, r, force=False):
 def generate_train_valid_dataset(dataset, labels, percent=1.0, size=''):
     num_traffics = int(dataset.shape[0] * percent)
     left = 0
-    right = int(0.8 * num_traffics)
+    right = int(0.9 * num_traffics)
     maybe_npsave('KDDCup/train_dataset' + size, dataset, left, right)
     maybe_npsave('KDDCup/train_ref' + size, labels, left, right)
 
@@ -275,24 +278,27 @@ def generate_train_valid_dataset(dataset, labels, percent=1.0, size=''):
     print('Training + Validation', dataset.shape, labels.shape)
 
 
-def generate_test_dataset(dataset, labels):
+def generate_test_dataset(dataset, labels, size=''):
     num_traffics = dataset.shape[0]
     print('Testing', dataset.shape, labels.shape)
+    maybe_npsave('KDDCup/test_dataset' + size, dataset, 0, num_traffics)
+    maybe_npsave('KDDCup/test_ref' + size, labels, 0, num_traffics)
 
-    maybe_npsave('KDDCup/test_dataset', dataset, 0, num_traffics)
-    maybe_npsave('KDDCup/test_ref', labels, 0, num_traffics)
 
+def generate_datasets():
+    global num_classes
+    num_classes = len(category_map)
 
-if __name__ == '__main__':
     train = 'KDDCup/kddcup.traindata'
     data_matrix = load_traffic(train)
     dataset, labels = shuffle_dataset_with_label(data_matrix)
-
-    generate_train_valid_dataset(dataset, labels, 0.5, '_small')
-    generate_train_valid_dataset(dataset, labels, 0.7, '_middle')
     generate_train_valid_dataset(dataset, labels)
 
     test = 'KDDCup/kddcup.testdata'
     data_matrix = load_traffic(test)
     dataset, labels = shuffle_dataset_with_label(data_matrix)
     generate_test_dataset(dataset, labels)
+
+
+if __name__ == '__main__':
+    generate_datasets()
