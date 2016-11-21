@@ -17,7 +17,7 @@ num_root: continuous.
 num_file_creations: continuous.
 num_shells: continuous.
 num_access_files: continuous.
-num_outbound_cmds: continuous.
+num_outbound_cmds: continuous. (this feature is always zero)
 is_host_login: symbolic.
 is_guest_login: symbolic.
 count: continuous.

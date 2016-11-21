@@ -1,20 +1,20 @@
 from __future__ import print_function
 import tensorflow as tf
-from utils import xavier_init, accuracy, measure_prediction
+import numpy as np
+from utils import xavier_init, accuracy, measure_prediction, get_batch
 
 
 class MultilayerPerceptron(object):
     def __init__(self, feature_size, hidden_layer_sizes, num_labels,
-                 init_learning_rate=0.99, decay_steps=100000,
-                 decay_base=0.96, trans_func=tf.nn.relu,
-                 reg_func=tf.nn.l2_loss, beta=0.009):
+                 init_learning_rate=0.9, decay_steps=100000, decay_base=0.96,
+                 trans_func=tf.nn.sigmoid, reg_func=tf.nn.l2_loss, beta=0.009,
+                 optimizer=tf.train.GradientDescentOptimizer):
         self.feature_size = feature_size
         self.layer_sizes = hidden_layer_sizes + [num_labels]
         self.num_labels = num_labels
         self.trans_func = trans_func
 
         self.params = self._create_variables()
-
         self.x = tf.placeholder(tf.float32, [None, feature_size])
         self.t = tf.placeholder(tf.float32, [None, num_labels])
         self.keep_prob = tf.placeholder(tf.float32)
@@ -28,11 +28,10 @@ class MultilayerPerceptron(object):
 
         # exponentially decaying learning rate
         global_step = tf.Variable(0, trainable=False)
-        self.learning_rate = tf.train.exponential_decay(
+        learning_rate = tf.train.exponential_decay(
             init_learning_rate, global_step, decay_steps,
             decay_base, staircase=True)
-        self.optimizer = tf.train.GradientDescentOptimizer(
-            self.learning_rate).minimize(self.loss, global_step=global_step)
+        self.optimizer = optimizer(learning_rate).minimize(self.loss, global_step=global_step)
 
         self.predict = tf.nn.softmax(self.final_logits)
 
@@ -57,17 +56,22 @@ class MultilayerPerceptron(object):
         for (i, hsize) in enumerate(self.layer_sizes):
             logits = tf.add(tf.matmul(next_input, self.params['w%d' % i]),
                             self.params['b%d' % i])
-            activity = self.trans_func(logits)
-            next_input = tf.nn.dropout(activity, self.keep_prob)
+            if i < len(self.layer_sizes) - 1:
+                activity = self.trans_func(logits)
+                next_input = tf.nn.dropout(activity, self.keep_prob)
+            else:
+                next_input = logits
+                print('Last layer is just linear logistic')
+
         return next_input
 
     def _create_regterm(self, reg_func, beta):
         regterm = reg_func([0.0])
-        for name, var in self.params.items():
-            regterm = tf.add(regterm, reg_func(var))
+        for (i, hsize) in enumerate(self.layer_sizes):
+            regterm = tf.add(regterm, reg_func(self.params['w%d' % i]))
         return tf.mul(beta, regterm)
 
-    def fit(self, X, T, prob):
+    def fit(self, X, T, prob=0.5):
         opt, loss, reg = self.sess.run(
             [self.optimizer, self.loss, self.regterm],
             feed_dict={self.x: X, self.t: T, self.keep_prob: prob})
@@ -79,23 +83,31 @@ class MultilayerPerceptron(object):
                                         self.keep_prob: prob})
 
     def calc_total_loss(self, X, T, prob=1.0):
-        return self.sess.run(self.loss,
+        loss = self.sess.run(self.loss,
                              feed_dict={self.x: X, self.t: T,
                                         self.keep_prob: prob})
+        return loss
 
     def train(self, train_dataset, train_labels, batch_size, num_steps, keep_prob=0.5):
         display_step = num_steps / 10
         print('Training for %d steps' % num_steps)
 
         for step in range(num_steps):
-            offset = (batch_size * step) % (train_labels.shape[0] - batch_size)
-            batch_data = train_dataset[offset:(offset + batch_size), :]
-            batch_labels = train_labels[offset:(offset + batch_size), :]
+            offset = (batch_size * step) % train_labels.shape[0]
+            end = (offset + batch_size) % train_labels.shape[0]
+            if end < offset:
+                batch_data = np.concatenate((train_dataset[offset:, :],
+                                             train_dataset[:end, :]), axis=0)
+                batch_labels = np.concatenate((train_labels[offset:, :],
+                                               train_labels[:end, :]), axis=0)
+            else:
+                batch_data = train_dataset[offset:(offset + batch_size), :]
+                batch_labels = train_labels[offset:(offset + batch_size), :]
 
             loss, reg = self.fit(batch_data, batch_labels, keep_prob)
             if step % display_step == 0:
-                print("Minibatch loss at step %d:\t%f(regterm=%f)"
-                      % (step, loss, reg))
+                print("Minibatch %d-%d loss at step %d:\t%f(regterm=%f)"
+                      % (offset, end, step, loss, reg))
                 batch_predict = self.make_prediction(batch_data)
                 print("Minibatch train accuracy: %f%%" %
                       accuracy(batch_predict, batch_labels))
@@ -103,7 +115,65 @@ class MultilayerPerceptron(object):
         print('Multilayer Perceptron trained')
         train_loss = self.calc_total_loss(train_dataset, train_labels)
         train_predict = self.make_prediction(train_dataset)
-        train_accuracy = accuracy(train_predict, train_labels)
         print("Trainset total loss: %f" % train_loss)
-        print("Trainset total accuracy: %f" % train_accuracy)
+        measure_prediction(train_predict, train_labels, 'Train')
+
+    def train_with_bias(self, train_dataset, train_labels, batch_size,
+                        num_steps, keep_prob=0.5):
+        display_step = num_steps / 10
+        print('Training for %d steps' % num_steps)
+
+        y = np.argmax(train_labels, 1)
+        X = np.array([train_dataset[y == i, :] for i in range(self.num_labels)])
+        Y = np.array([train_labels[y == i, :] for i in range(self.num_labels)])
+        print(X[0].shape, Y[0].shape)
+        print(X[1].shape, X[1].shape)
+
+        if self.num_labels > 2:
+            batch_size /= (self.num_labels - 1)
+            for step in range(num_steps):
+                train0, label0 = get_batch(X[0], Y[0], step, batch_size)
+                train1, label1 = get_batch(X[1], Y[1], step, batch_size)
+                train2, label2 = get_batch(X[2], Y[2], step, batch_size)
+                # train3 = X[3][np.random.choice(X[3].shape[0], 50), :]
+                train3 = X[3][:, :]
+                label3 = Y[3][:, :]
+                train4, label4 = get_batch(X[4], Y[4], step, batch_size)
+
+                batch_data = np.concatenate((train0, train1, train2, train3, train4), axis=0)
+                batch_labels = np.concatenate((label0, label1, label2, label3, label4), axis=0)
+                perm = np.random.permutation(batch_data.shape[0])
+                batch_data = batch_data[perm, :]
+                batch_labels = batch_labels[perm, :]
+
+                loss, reg = self.fit(batch_data, batch_labels, keep_prob)
+                if step % display_step == 0:
+                    print("Minibatch(%d cases) loss at step %d:\t%f(regterm=%f)"
+                          % (batch_labels.shape[0], step, loss, reg))
+                    batch_predict = self.make_prediction(batch_data)
+                    print("Minibatch train accuracy: %f%%" %
+                          accuracy(batch_predict, batch_labels))
+        else:
+            for step in range(num_steps):
+                train0, label0 = get_batch(X[0], Y[0], step, batch_size)
+                train1, label1 = get_batch(X[1], Y[1], step, batch_size)
+
+                batch_data = np.concatenate((train0, train1), axis=0)
+                batch_labels = np.concatenate((label0, label1), axis=0)
+                # perm = np.random.permutation(batch_data.shape[0])
+                # batch_data = batch_data[perm, :]
+                # batch_labels = batch_labels[perm, :]
+
+                loss, reg = self.fit(batch_data, batch_labels, keep_prob)
+                if step % display_step == 0:
+                    print("Minibatch(%d cases) loss at step %d:\t%f(regterm=%f)"
+                          % (batch_labels.shape[0], step, loss, reg))
+                    batch_predict = self.make_prediction(batch_data)
+                    print("Minibatch train accuracy: %f%%" %
+                          accuracy(batch_predict, batch_labels))
+
+        print('Multilayer Perceptron trained')
+        train_loss = self.calc_total_loss(train_dataset, train_labels)
+        train_predict = self.make_prediction(train_dataset)
+        print("Trainset total loss: %f" % train_loss)
         measure_prediction(train_predict, train_labels, 'Train')

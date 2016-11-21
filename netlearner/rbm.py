@@ -6,7 +6,7 @@ from utils import xavier_init, sample_prob_dist
 
 class RestrictedBoltzmannMachine(object):
     def __init__(self, num_visible, num_hidden, batch_size,
-                 lr=0.01, trans_func=tf.nn.sigmoid):
+                 lr=0.1, trans_func=tf.nn.sigmoid):
         self.num_visible = num_visible
         self.num_hidden = num_hidden
         self.lr = lr
@@ -15,13 +15,13 @@ class RestrictedBoltzmannMachine(object):
         self.weights = self._initialize_weights()
 
         # v is used for both cd and generate hidden states
-        self.v = tf.placeholder(tf.float32, [None, num_visible])
+        self.v = tf.placeholder(tf.float32, [None, num_visible], name='v')
 
         # h is just used for generate visible states
-        self.h = tf.placeholder(tf.float32, [None, num_hidden])
+        self.h = tf.placeholder(tf.float32, [None, num_hidden], name='h')
 
-        self.vrand = tf.placeholder(tf.float32, [None, num_visible])
-        self.hrand = tf.placeholder(tf.float32, [None, num_hidden])
+        self.vrand = tf.placeholder(tf.float32, [None, num_visible], name='vrand')
+        self.hrand = tf.placeholder(tf.float32, [None, num_hidden], name='hrand')
 
         self.batch_size = batch_size
 
@@ -31,7 +31,7 @@ class RestrictedBoltzmannMachine(object):
 
         # generate visible state from hidden state x
         # and random distribution vrand
-        self.reconstruct = self.sample_visible_from_hidden(self.h)
+        self.reconstruct = self.sample_visible_from_hidden(self.encode)[0]
 
         # training algorithm: constractive divergence
         self.updates = self._create_cd1()
@@ -102,7 +102,7 @@ class RestrictedBoltzmannMachine(object):
         # update_bv = tf.assign_add(self.weights['bv'], g_bv)
 
         # mean squared error
-        loss = 0.5 * tf.reduce_mean(tf.square(tf.sub(neg_vstate, self.v)))
+        loss = 0.5 * tf.reduce_sum(tf.square(tf.sub(neg_vstate, self.v)))
 
         return [loss, update_w]
         # return [loss, update_w, update_bh, update_bv]
@@ -113,7 +113,7 @@ class RestrictedBoltzmannMachine(object):
                                         self.vrand: Vrand, self.hrand: Hrand})
 
     def calculate_goodness(self, V, Hrand):
-        hstates = self.encodeDataset(V, Hrand)
+        hstates = self.encode_dataset(V, Hrand)
         return self.sess.run(self.goodness,
                              feed_dict={self.v: V, self.h: hstates})
 
@@ -121,9 +121,11 @@ class RestrictedBoltzmannMachine(object):
         return self.sess.run(self.encode,
                              feed_dict={self.v: V, self.hrand: Hrand})
 
-    def reconstruct_dataset(self, H, Vrand):
+    def reconstruct_dataset(self, V, Vrand, Hrand):
         return self.sess.run(self.reconstruct,
-                             feed_dict={self.h: H, self.vrand: Vrand})
+                             feed_dict={self.v: V,
+                                        self.hrand: Hrand,
+                                        self.vrand: Vrand})
 
     def reconstruct_loss(self, V, Vrand, Hrand):
         return self.sess.run(self.loss,
@@ -134,11 +136,15 @@ class RestrictedBoltzmannMachine(object):
         display_steps = num_steps / 10
         for step in range(num_steps):
             offset = (batch_size * step) % (train_dataset.shape[0] - batch_size)
-            batch_data = train_dataset[offset:(offset + batch_size), :]
-            batch_vrand = np.random.binomial(1, 0.5, size=[batch_data.shape[0],
-                                                           self.num_visible])
-            batch_hrand = np.random.binomial(1, 0.5, size=(batch_data.shape[0],
-                                                           self.num_hidden))
+            end = (offset + batch_size) % train_dataset.shape[0]
+            if end < offset:
+                batch_data = np.concatenate((train_dataset[offset:, :],
+                                             train_dataset[:end, :]), axis=0)
+            else:
+                batch_data = train_dataset[offset:(offset + batch_size), :]
+
+            batch_vrand = np.random.random([batch_data.shape[0], self.num_visible])
+            batch_hrand = np.random.random((batch_data.shape[0], self.num_hidden))
             l, _ = self.run_train_step(batch_data, batch_vrand, batch_hrand)
 
             if step % display_steps == 0:
@@ -146,12 +152,10 @@ class RestrictedBoltzmannMachine(object):
 
         print('Restricted Boltzmann Machine trained')
 
-    def testReconstruction(self, test_dataset):
+    def test_reconstruction(self, test_dataset):
         # train_loss = rbm.calculate_goodness(train_dataset)
         # print("Trainset goodness: %f" % train_loss)
-        vrand = np.random.binomial(1, 0.5, size=(test_dataset.shape[0],
-                                                 self.num_visible))
-        hrand = np.random.binomial(1, 0.5, size=(test_dataset.shape[0],
-                                                 self.num_hidden))
+        vrand = np.random.random(size=(test_dataset.shape[0], self.num_visible))
+        hrand = np.random.random(size=(test_dataset.shape[0], self.num_hidden))
         test_loss = self.reconstruct_loss(test_dataset, vrand, hrand)
         print("Testset reconstruction error: %f" % test_loss)

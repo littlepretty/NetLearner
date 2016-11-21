@@ -247,7 +247,7 @@ def shuffle_dataset_with_label(matrix, contain_label=True):
         return matrix, None
 
 
-def maybe_npsave(dataname, data, l, r, force=False):
+def maybe_npsave(dataname, data, l, r, force=False, binary_label=False):
     if binary_label:
         dataname = dataname + '_bin'
     filename = dataname + '.npy'
