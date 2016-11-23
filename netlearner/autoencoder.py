@@ -81,10 +81,13 @@ class Autoencoder(object):
         return loss
 
     def calc_regularization(self):
-        return self.sess.run(self.regterm)
+        return self.l2_weight * self.sess.run(self.regterm)
 
     def calc_reconstruct_loss(self, X):
         return self.sess.run(self.reconstruction_loss, feed_dict={self.x: X})
+
+    def calc_kl_divergence(self, X):
+        return 0
 
     def encode_dataset(self, X):
         return self.sess.run(self.encode, feed_dict={self.x: X})
@@ -115,9 +118,9 @@ class Autoencoder(object):
             loss = self.partial_fit(batch_data)
             if step % display_step == 0:
                 reg = self.calc_regularization()
-                print("Batch loss at step %d:\t%f (regterm=%f)" % (step, loss, reg))
+                print("Batch loss at step %d: %f (regterm=%f)" % (step, loss, reg))
                 batch_loss = self.calc_reconstruct_loss(batch_data)
-                print("Batch reconstruction loss:\t%f" % batch_loss)
+                print("Batch reconstruction loss: %f" % batch_loss)
 
         print('%s Training Summary' % self.name)
         train_loss = self.calc_reconstruct_loss(train_dataset)
@@ -149,10 +152,15 @@ class Autoencoder(object):
             loss = self.partial_fit(batch_data)
             if step % display_step == 0:
                 reg = self.calc_regularization()
-                print("Minibatch(%d cases) loss at step %d:\t%f(regterm=%f)"
-                      % (batch_data.shape[0], step, loss, reg))
+                if self.kl_divergence is not None:
+                    kl = self.calc_kl_divergence(batch_data)
+                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f, regterm=%f)"
+                          % (batch_data.shape[0], step, loss, kl, reg))
+                else:
+                    print("Minibatch(%d cases) loss at step %d: %f(regterm=%f)"
+                          % (batch_data.shape[0], step, loss, reg))
                 batch_loss = self.calc_reconstruct_loss(batch_data)
-                print("Batch reconstruction loss:\t%f" % batch_loss)
+                print("Batch reconstruction loss: %f" % batch_loss)
 
         print('%s Training Summary' % self.name)
         train_loss = self.calc_reconstruct_loss(train_dataset)
@@ -171,8 +179,10 @@ class SparseAutoencoder(Autoencoder):
         self.sparsity = sparsity
 
     def _create_kl_node(self):
-        return tf.reduce_sum(tf.abs(self.encode))
-        # # convert average activity to probabilistic distribution
+        return tf.reduce_sum(
+            tf.reduce_mean(tf.abs(self.encode),
+                           reduction_indices=0))
+        # convert average activity to probabilistic distribution
         # activity = tf.reduce_mean(self.encode, reduction_indices=0)
         # activity = tf.div(activity, tf.reduce_sum(self.encode))
         #
@@ -201,6 +211,10 @@ class SparseAutoencoder(Autoencoder):
                                   feed_dict={self.x: X,
                                              self.sparsity_vector: sparsity_vector})
         return loss
+
+    def calc_kl_divergence(self, X):
+        kl = self.sess.run(self.kl_divergence, feed_dict={self.x: X})
+        return kl * self.sparsity_weight
 
 
 class MaskNoiseAutoencoder(Autoencoder):
