@@ -5,10 +5,8 @@ from tensorflow.examples.tutorials.mnist import input_data
 import matplotlib.pyplot as plt
 
 
-def test_mnist():
-    mnist = input_data.read_data_sets(
-        '~/Researches/MachineLearning/TFTutorial/MNIST_data',
-        one_hot=True)
+def test_mnist_with_rbm():
+    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
     train_dataset = mnist.train.images
     test_dataset = mnist.test.images
     print('Trainset', train_dataset.shape)
@@ -53,4 +51,4 @@ def test_mnist():
     plt.title('Reconstructed train image')
     plt.show()
 
-test_mnist()
+test_mnist_with_rbm()
