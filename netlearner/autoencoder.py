@@ -118,7 +118,13 @@ class Autoencoder(object):
             loss = self.partial_fit(batch_data)
             if step % display_step == 0:
                 reg = self.calc_regularization()
-                print("Batch loss at step %d: %f (regterm=%f)" % (step, loss, reg))
+                if self.kl_divergence is not None:
+                    kl = self.calc_kl_divergence(batch_data)
+                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f, regterm=%f)"
+                          % (batch_data.shape[0], step, loss, kl, reg))
+                else:
+                    print("Minibatch(%d cases) loss at step %d: %f(regterm=%f)"
+                          % (batch_data.shape[0], step, loss, reg))
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 print("Batch reconstruction loss: %f" % batch_loss)
 

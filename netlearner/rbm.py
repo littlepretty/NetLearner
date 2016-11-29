@@ -189,3 +189,6 @@ class RestrictedBoltzmannMachine(object):
         print('Restricted Boltzmann Machine trained')
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
+
+    def get_weights(self, name):
+        return self.sess.run(self.weights[name])
