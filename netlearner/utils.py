@@ -32,7 +32,7 @@ def accuracy_binary(predictions, labels):
     actual_class = np.argmax(labels, 1)
     correct1 = np.logical_and(np.greater(predicted_class, 0), np.greater(actual_class, 0))
     correct2 = np.logical_and(predicted_class == 0, actual_class == 0)
-    return (np.sum(correct1) + np.sum(correct2)) / float(predictions.shape[0])
+    return 100.0 * (np.sum(correct1) + np.sum(correct2)) / float(predictions.shape[0])
 
 
 def compute_classification_table(predictions, labels):
