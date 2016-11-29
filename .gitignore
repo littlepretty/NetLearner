@@ -2,5 +2,8 @@
 build
 dist
 netleaner.egg-info
-.ipyne_checkpoints
+.ipynb_checkpoints
+*.npy
+*.egg-info
+.idea
 
