@@ -38,8 +38,7 @@ class RestrictedBoltzmannMachine(object):
         # measure the goodness of the weights
         self.goodness = self._create_goodness()
 
-        init = tf.initialize_all_variables()
-
+        init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
         print('Initialized')

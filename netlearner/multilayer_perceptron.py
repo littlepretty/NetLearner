@@ -35,7 +35,7 @@ class MultilayerPerceptron(object):
 
         self.predict = tf.nn.softmax(self.final_logits)
 
-        init = tf.initialize_all_variables()
+        init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
         print('Multilayer Perceptron build and initialized')

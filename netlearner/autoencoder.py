@@ -35,7 +35,7 @@ class Autoencoder(object):
         self.loss = self._create_loss_node()
         self.optimizer = optimizer(encode_lr).minimize(self.loss)
 
-        init = tf.initialize_all_variables()
+        init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
         print('%s built and initialized' % name)

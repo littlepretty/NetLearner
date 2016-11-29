@@ -103,7 +103,7 @@ class StackedRBM(object):
 
         self.optimizer = self.ft_optimizer(self.ft_lr).minimize(self.ft_loss)
         self.predict = tf.nn.softmax(self.ft_final_logits)
-        init = tf.initialize_all_variables()
+        init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
         print('Stacked RBM build and initialized')
