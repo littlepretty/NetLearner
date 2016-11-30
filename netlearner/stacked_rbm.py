@@ -9,7 +9,7 @@ class StackedRBM(object):
     def __init__(self, feature_size, rbm_layer_sizes, num_labels,
                  rbm_lr=0.1, rbm_trans_func=tf.nn.sigmoid, rbm_batch_size=400,
                  ft_trans_func=tf.nn.relu, ft_reg_func=tf.nn.l2_loss,
-                 ft_lr=0.0002, ft_reg_factor=0.0001,
+                 ft_lr=0.0001, ft_reg_factor=0.0001,
                  ft_optimizer=tf.train.GradientDescentOptimizer):
         self.feature_size = feature_size
         self.num_labels = num_labels
@@ -187,7 +187,7 @@ class StackedRBM(object):
         measure_prediction(train_predict, train_labels, 'Train')
 
     def train(self, train_dataset, train_labels, rbm_batch_sizes, rbm_num_steps,
-              ft_batch_size, ft_num_steps, ft_keep_prob=1.0):
+              ft_batch_size, ft_num_steps, ft_keep_prob=0.72):
         self.run_pretrain(train_dataset, rbm_batch_sizes, rbm_num_steps)
         self.unrolling()
         self.run_fine_tuning(train_dataset, train_labels, ft_batch_size, ft_num_steps, ft_keep_prob)
