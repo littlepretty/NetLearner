@@ -57,15 +57,24 @@ def compute_classification_table_binary(predictions, labels):
 
 
 def correct_percentage(matrix):
-    epsilon = 1e-20
+    """
+    :param matrix: map from actual to predicted
+    :return: precision and recall measurement
+    """
+    epsilon = 1e-26
     num_classes = matrix.shape[0]
-    act2pred = [matrix[i][i] / (np.sum(matrix[i, :]) + epsilon)
-                for i in range(num_classes)]
-    pred2act = [matrix[i][i] / (np.sum(matrix[:, i]) + epsilon)
-                for i in range(num_classes)]
-    print(act2pred)
-    print(pred2act)
-    return act2pred, pred2act
+    precision = [matrix[i][i] / (np.sum(matrix[i, :]) + epsilon)
+                 for i in range(num_classes)]
+    recall = [matrix[i][i] / (np.sum(matrix[:, i]) + epsilon)
+              for i in range(num_classes)]
+    fscore = [2 * precision[i] * recall[i] / (precision[i] + recall[i] + epsilon)
+              for i in range(len(precision))]
+
+    headers = ['Class'] + [str(i) for i in range(matrix.shape[0])]
+    row1 = ['Precision'] + ['%.2f%%' % (p * 100.0) for p in precision]
+    row2 = ['Recall'] + ['%.2f%%' % (r * 100.0) for r in recall]
+    row3 = ['F1-Score'] + ['%.2f%%' % (f * 100.0) for f in fscore]
+    print(tabulate([row1, row2, row3], headers))
 
 
 def xavier_init(fan_in, fan_out, constant=1):
