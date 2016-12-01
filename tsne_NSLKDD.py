@@ -18,11 +18,11 @@ train_labels = np.concatenate((train_labels, valid_labels), axis=0)
 
 total_size = test_dataset.shape[0]
 sample_index = np.random.choice(total_size,
-                                size=int(0.05 * total_size), replace=False)
+                                size=int(0.96 * total_size), replace=False)
 test_dataset = test_dataset[sample_index, :]
 test_labels = np.argmax(test_labels[sample_index], 1)
 
 test_Y = tsne(test_dataset, 2, test_dataset.shape[1])
 fig, ax = plt.subplots(1, 1)
 ax.scatter(test_Y[:, 0], test_Y[:, 1], 20, test_labels)
-pickle.dump(fig, open('NSLKDD.fig.pickle', 'wb'))
+pickle.dump(fig, open('origin_data.pickle', 'wb'))
