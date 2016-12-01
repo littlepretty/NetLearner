@@ -6,21 +6,19 @@ from utils import xavier_init, get_batch
 
 class Autoencoder(object):
     def __init__(self, feature_size, encode_size, encode_lr=0.001,
-                 l2_weight=0.001, sparsity_weight=0.05,
-                 transfer_func=tf.nn.softplus,
-                 optimizer=tf.train.AdamOptimizer,
-                 name='Autoencoder'):
+                 sparsity_weight=0.05, transfer_func=tf.nn.softplus,
+                 optimizer=tf.train.AdamOptimizer, name='Autoencoder'):
         self.feature_size = feature_size
         self.encode_size = encode_size
-        self.l2_weight = l2_weight
-        self.sparsity_weight = sparsity_weight
-
         self.transfer_func = transfer_func
         self.name = name
 
+        # for sparse autoencoder
+        self.sparsity_weight = sparsity_weight
+
         # model
         self.x = tf.placeholder(tf.float32, [None, self.feature_size])
-        self.keep_prob = tf.placeholder(tf.float32)
+        self.mask_prob = tf.placeholder(tf.float32)
         self.sparsity_vector = tf.placeholder(tf.float32, [self.encode_size])
 
         self.weights = self._initialize_weights()
@@ -29,7 +27,6 @@ class Autoencoder(object):
         self.reconstruction = self._create_reconstruction_node()
 
         self.reconstruction_loss = self._create_reconstruction_loss_node()
-        self.regterm = self._create_regularization_node()
         self.kl_divergence = self._create_kl_node()
 
         self.loss = self._create_loss_node()
@@ -59,29 +56,20 @@ class Autoencoder(object):
         return tf.add(tf.matmul(self.encode, self.weights['w2']),
                       self.weights['b2'])
 
-    def _create_regularization_node(self):
-        l2regterm = tf.nn.l2_loss(self.weights['w1'])
-        l2regterm = tf.add(l2regterm, tf.nn.l2_loss(self.weights['w2']))
-        return l2regterm
-
     def _create_reconstruction_loss_node(self):
-        reconstruction_loss = 0.5 * tf.reduce_sum(tf.pow(
-            tf.sub(self.reconstruction, self.x), 2.0))
+        reconstruction_loss = 0.5 * tf.reduce_sum(tf.pow(tf.sub(self.reconstruction, self.x), 2.0))
         return reconstruction_loss
 
     def _create_kl_node(self):
         return None
 
     def _create_loss_node(self):
-        return self.reconstruction_loss + self.regterm
+        return self.reconstruction_loss
 
     def partial_fit(self, X):
         opt, loss = self.sess.run([self.optimizer, self.loss],
                                   feed_dict={self.x: X})
         return loss
-
-    def calc_regularization(self):
-        return self.l2_weight * self.sess.run(self.regterm)
 
     def calc_reconstruct_loss(self, X):
         return self.sess.run(self.reconstruction_loss, feed_dict={self.x: X})
@@ -117,14 +105,13 @@ class Autoencoder(object):
 
             loss = self.partial_fit(batch_data)
             if step % display_step == 0:
-                reg = self.calc_regularization()
                 if self.kl_divergence is not None:
                     kl = self.calc_kl_divergence(batch_data)
-                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f, regterm=%f)"
-                          % (batch_data.shape[0], step, loss, kl, reg))
+                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f)"
+                          % (batch_data.shape[0], step, loss, kl))
                 else:
-                    print("Minibatch(%d cases) loss at step %d: %f(regterm=%f)"
-                          % (batch_data.shape[0], step, loss, reg))
+                    print("Minibatch(%d cases) loss at step %d: %f"
+                          % (batch_data.shape[0], step, loss))
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 print("Batch reconstruction loss: %f" % batch_loss)
 
@@ -157,14 +144,13 @@ class Autoencoder(object):
 
             loss = self.partial_fit(batch_data)
             if step % display_step == 0:
-                reg = self.calc_regularization()
                 if self.kl_divergence is not None:
                     kl = self.calc_kl_divergence(batch_data)
-                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f, regterm=%f)"
-                          % (batch_data.shape[0], step, loss, kl, reg))
+                    print("Minibatch(%d cases) loss at step %d: %f(kl=%f)"
+                          % (batch_data.shape[0], step, loss, kl))
                 else:
-                    print("Minibatch(%d cases) loss at step %d: %f(regterm=%f)"
-                          % (batch_data.shape[0], step, loss, reg))
+                    print("Minibatch(%d cases) loss at step %d: %f"
+                          % (batch_data.shape[0], step, loss))
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 print("Batch reconstruction loss: %f" % batch_loss)
 
@@ -176,18 +162,17 @@ class Autoencoder(object):
 class SparseAutoencoder(Autoencoder):
     def __init__(self, feature_size, encode_size,
                  sparsity=0.05, sparsity_weight=0.05,
-                 encode_lr=0.001, l2_weight=0.003,
+                 encode_lr=0.001,
                  transfer_func=tf.nn.softplus,
                  optimizer=tf.train.AdamOptimizer):
         super(SparseAutoencoder, self).__init__(
             feature_size, encode_size, encode_lr,
-            l2_weight, sparsity_weight, transfer_func, optimizer, 'Sparse Autoencoder')
+            sparsity_weight, transfer_func, optimizer, 'Sparse Autoencoder')
         self.sparsity = sparsity
 
     def _create_kl_node(self):
         return tf.reduce_sum(
-            tf.reduce_mean(tf.abs(self.encode),
-                           reduction_indices=0))
+            tf.reduce_mean(tf.abs(self.encode), reduction_indices=0))
         # convert average activity to probabilistic distribution
         # activity = tf.reduce_mean(self.encode, reduction_indices=0)
         # activity = tf.div(activity, tf.reduce_sum(self.encode))
@@ -207,8 +192,7 @@ class SparseAutoencoder(Autoencoder):
         # return kl_divergence
 
     def _create_loss_node(self):
-        loss = tf.add(self.reconstruction_loss, self.regterm * self.l2_weight)
-        loss = tf.add(loss, self.kl_divergence * self.sparsity_weight)
+        loss = tf.add(self.reconstruction_loss, self.kl_divergence * self.sparsity_weight)
         return loss
 
     def partial_fit(self, X):
@@ -224,33 +208,33 @@ class SparseAutoencoder(Autoencoder):
 
 
 class MaskNoiseAutoencoder(Autoencoder):
-    def __init__(self, feature_size, encode_size, mask_prob,
-                 encode_lr=0.001, l2_weight=0.003, sparsity_weight=0.05,
+    def __init__(self, feature_size, encode_size, mask_frac,
+                 encode_lr=0.001, sparsity_weight=0.05,
                  transfer_func=tf.nn.softplus,
                  optimizer=tf.train.AdamOptimizer):
         super(MaskNoiseAutoencoder, self).__init__(
             feature_size, encode_size, encode_lr,
-            l2_weight, sparsity_weight, transfer_func, optimizer, 'Denoise Autoencoder')
-        self.mask_prob = mask_prob
+            sparsity_weight, transfer_func, optimizer, 'Denoise Autoencoder')
+        self.mask_frac = mask_frac
 
     def _create_encode_node(self):
-        mask = tf.mul(self.keep_prob, tf.nn.dropout(self.x, self.keep_prob))
+        mask = tf.mul(self.mask_prob, tf.nn.dropout(self.x, self.mask_prob))
         logits = tf.add(tf.matmul(mask, self.weights['w1']), self.weights['b1'])
         return self.transfer_func(logits)
 
     def partial_fit(self, X):
         opt, loss = self.sess.run([self.optimizer, self.loss],
-                                  feed_dict={self.x: X, self.keep_prob: self.mask_prob})
+                                  feed_dict={self.x: X, self.mask_prob: self.mask_frac})
         return loss
 
     def calc_reconstruct_loss(self, X):
         return self.sess.run(self.loss,
-                             feed_dict={self.x: X, self.keep_prob: 1.0})
+                             feed_dict={self.x: X, self.mask_prob: 1.0})
 
     def encode_dataset(self, X):
         return self.sess.run(self.encode,
-                             feed_dict={self.x: X, self.keep_prob: 1.0})
+                             feed_dict={self.x: X, self.mask_prob: 1.0})
 
     def reconstruct(self, X):
         return self.sess.run(self.reconstruction,
-                             feed_dict={self.x: X, self.keep_prob: 1.0})
+                             feed_dict={self.x: X, self.mask_prob: 1.0})
