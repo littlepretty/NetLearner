@@ -6,7 +6,7 @@ from utils import xavier_init, accuracy, measure_prediction, get_batch
 
 class MultilayerPerceptron(object):
     def __init__(self, feature_size, hidden_layer_sizes, num_labels,
-                 init_learning_rate=0.64, decay_steps=100000, decay_base=0.96,
+                 init_learning_rate=0.64, decay_steps=10000, decay_base=0.96,
                  trans_func=tf.nn.sigmoid, reg_func=tf.nn.l2_loss, beta=0.009,
                  optimizer=tf.train.GradientDescentOptimizer):
         self.feature_size = feature_size
@@ -27,11 +27,11 @@ class MultilayerPerceptron(object):
         self.loss = self.classify_loss + self.regterm
 
         # exponentially decaying learning rate
-        # global_step = tf.Variable(0, trainable=False)
-        # learning_rate = tf.train.exponential_decay(
-        #     init_learning_rate, global_step, decay_steps,
-        #     decay_base, staircase=True)
-        self.optimizer = optimizer(init_learning_rate).minimize(self.loss)
+        global_step = tf.Variable(0, trainable=False)
+        learning_rate = tf.train.exponential_decay(
+            init_learning_rate, global_step, decay_steps,
+            decay_base, staircase=True)
+        self.optimizer = optimizer(learning_rate).minimize(self.loss)
 
         self.predict = tf.nn.softmax(self.final_logits)
 
