@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import os
+import errno
 import tensorflow as tf
 from tabulate import tabulate
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
@@ -136,3 +137,11 @@ def get_batch(train_dataset, train_labels, step, batch_size):
     # print(batch_data.shape)
     # print(batch_labels.shape)
     return batch_data, batch_labels
+
+
+def create_dir(dirname):
+    try:
+        os.mkdir(dirname)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
