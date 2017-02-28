@@ -1,16 +1,18 @@
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-from utils import xavier_init, sample_prob_dist, get_batch
+from utils import xavier_init, sample_prob_dist, get_batch, create_dir
 
 
 class RestrictedBoltzmannMachine(object):
     def __init__(self, num_visible, num_hidden, batch_size,
-                 lr=0.1, trans_func=tf.nn.sigmoid):
+                 lr=0.1, trans_func=tf.nn.sigmoid,
+                 restore_dir=None):
         self.num_visible = num_visible
         self.num_hidden = num_hidden
         self.lr = lr
         self.trans_func = trans_func
+        self.name = "rbm"
 
         self.weights = self._initialize_weights()
 
@@ -38,19 +40,31 @@ class RestrictedBoltzmannMachine(object):
         # measure the goodness of the weights
         self.goodness = self._create_goodness()
 
-        init = tf.global_variables_initializer()
+        self.train_writer = tf.summary.FileWriter('%s/train' % self.name)
+        self._create_summaries()
+        self.merged_summary = tf.summary.merge_all()
+
         self.sess = tf.Session()
-        self.sess.run(init)
-        print('Initialized')
+        self.saver = tf.train.Saver(self.weights)
+        if restore_dir is not None:
+            self.model_dir = restore_dir
+            self.saver.restore(self.sess, self.model_dir)
+            print('Model restored')
+        else:
+            init = tf.global_variables_initializer()
+            self.model_dir = 'rbm_models/%dby%d' % (num_visible, num_hidden)
+            create_dir('rbm_models')
+            self.sess.run(init)
+            print('Model initialized')
 
     def _initialize_weights(self):
         weights = dict()
         weights['w'] = tf.Variable(xavier_init(self.num_visible,
-                                               self.num_hidden))
+                                               self.num_hidden), name='w')
         weights['bh'] = tf.Variable(tf.zeros(shape=[self.num_hidden],
-                                             dtype=tf.float32))
+                                             dtype=tf.float32), name='bh')
         weights['bv'] = tf.Variable(tf.zeros(shape=[self.num_visible],
-                                             dtype=tf.float32))
+                                             dtype=tf.float32), name='bv')
         return weights
 
     def _create_goodness(self):
@@ -155,6 +169,7 @@ class RestrictedBoltzmannMachine(object):
         print('Restricted Boltzmann Machine trained')
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
+        self.save_variables()
 
     def train_with_labels(self, train_dataset, train_labels, batch_size, num_steps):
         display_step = num_steps / 10
@@ -188,6 +203,37 @@ class RestrictedBoltzmannMachine(object):
         print('Restricted Boltzmann Machine trained')
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
+        # self.save_variables()
+        self.train_writer.add_summary(self.sess.run(self.merged_summary))
 
     def get_weights(self, name):
         return self.sess.run(self.weights[name])
+
+    def save_variables(self):
+        save_path = self.saver.save(self.sess, self.model_dir)
+        print("Model saved to file", save_path)
+
+    def _create_summaries(self):
+        print("Start visualize features of encoder layer")
+        layer_weight = tf.transpose(self.weights['w'])
+        x_min = tf.reduce_min(layer_weight)
+        x_max = tf.reduce_max(layer_weight)
+        normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
+
+        num_neurons = normalized_layer_weight.get_shape()[0].value
+        input_dim = normalized_layer_weight.get_shape()[1].value
+        unit_edge = int(np.sqrt(input_dim))
+        edge = int(np.sqrt(num_neurons))
+
+        if unit_edge * unit_edge == input_dim:
+            weight_by_neuron = tf.reshape(normalized_layer_weight, [num_neurons, unit_edge, unit_edge, 1])
+            tf.image_summary('v2h', weight_by_neuron, max_images=num_neurons)
+            tf.image_summary('all0', tf.zeros([1, edge, edge, 1]))
+
+        tf.summary.histogram('histogram of visible to hidden layer weights', layer_weight)
+        tf.summary.scalar('min weight', x_min)
+        tf.summary.scalar('max weight', x_max)
+        mean = tf.reduce_mean(layer_weight)
+        tf.summary.scalar('mean weight', mean)
+        stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+        tf.summary.scalar('stddev weight', stddev)
