@@ -7,7 +7,7 @@ from utils import xavier_init, get_batch
 class Autoencoder(object):
     def __init__(self, feature_size, encode_size, encode_lr=0.001,
                  sparsity_weight=0.05, transfer_func=tf.nn.softplus,
-                 optimizer=tf.train.AdamOptimizer, name='Autoencoder'):
+                 optimizer=tf.train.AdamOptimizer, name='ae'):
         self.feature_size = feature_size
         self.encode_size = encode_size
         self.transfer_func = transfer_func
@@ -31,6 +31,10 @@ class Autoencoder(object):
 
         self.loss = self._create_loss_node()
         self.optimizer = optimizer(encode_lr).minimize(self.loss)
+
+        self.train_writer = tf.summary.FileWriter('%s/train' % self.name)
+        self._create_summaries()
+        self.merged_summary = tf.summary.merge_all()
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -65,6 +69,26 @@ class Autoencoder(object):
 
     def _create_loss_node(self):
         return self.reconstruction_loss
+
+    def _create_summaries(self):
+        print("Start visualize features of encoder layer")
+        layer_weight = tf.transpose(self.weights['w1'])
+        x_min = tf.reduce_min(layer_weight)
+        x_max = tf.reduce_max(layer_weight)
+        normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
+
+        num_images = normalized_layer_weight.get_shape()[0].value
+        image_size = normalized_layer_weight.get_shape()[1].value
+        edge = int(np.sqrt(image_size))
+        images = tf.reshape(normalized_layer_weight, [num_images, edge, edge, 1])
+        tf.image_summary('layer1', images, max_images=num_images)
+        tf.summary.histogram('histogram of layer1 weights', layer_weight)
+        tf.summary.scalar('min weight in layer1', x_min)
+        tf.summary.scalar('max weight in layer1', x_max)
+        mean = tf.reduce_mean(layer_weight)
+        tf.summary.scalar('mean in layer1', mean)
+        stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+        tf.summary.scalar('stddev in layer1', stddev)
 
     def partial_fit(self, X):
         opt, loss = self.sess.run([self.optimizer, self.loss],
@@ -157,6 +181,7 @@ class Autoencoder(object):
         print('%s Training Summary' % self.name)
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
+        self.train_writer.add_summary(self.sess.run(self.merged_summary))
 
 
 class SparseAutoencoder(Autoencoder):
@@ -167,7 +192,7 @@ class SparseAutoencoder(Autoencoder):
                  optimizer=tf.train.AdamOptimizer):
         super(SparseAutoencoder, self).__init__(
             feature_size, encode_size, encode_lr,
-            sparsity_weight, transfer_func, optimizer, 'Sparse Autoencoder')
+            sparsity_weight, transfer_func, optimizer, 'sparseAE')
         self.sparsity = sparsity
 
     def _create_kl_node(self):
@@ -214,7 +239,7 @@ class MaskNoiseAutoencoder(Autoencoder):
                  optimizer=tf.train.AdamOptimizer):
         super(MaskNoiseAutoencoder, self).__init__(
             feature_size, encode_size, encode_lr,
-            sparsity_weight, transfer_func, optimizer, 'Denoise Autoencoder')
+            sparsity_weight, transfer_func, optimizer, 'dAE')
         self.mask_frac = mask_frac
 
     def _create_encode_node(self):
