@@ -7,7 +7,7 @@ from utils import xavier_init, accuracy, measure_prediction, get_batch
 class MultilayerPerceptron(object):
     def __init__(self, feature_size, hidden_layer_sizes, num_labels,
                  init_learning_rate=0.64, decay_steps=10000, decay_base=0.96,
-                 trans_func=tf.nn.sigmoid, reg_func=tf.nn.l2_loss, beta=0.009,
+                 trans_func=tf.nn.relu, reg_func=tf.nn.l2_loss, beta=0.009,
                  optimizer=tf.train.GradientDescentOptimizer):
         self.feature_size = feature_size
         self.layer_sizes = hidden_layer_sizes + [num_labels]
@@ -34,6 +34,10 @@ class MultilayerPerceptron(object):
         self.optimizer = optimizer(learning_rate).minimize(self.loss)
 
         self.predict = tf.nn.softmax(self.final_logits)
+
+        self.train_writer = tf.summary.FileWriter('mlp/train')
+        self._create_summaries()
+        self.merged_summary = tf.summary.merge_all()
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -179,3 +183,26 @@ class MultilayerPerceptron(object):
         train_predict = self.make_prediction(train_dataset)
         print("Trainset total loss: %f" % train_loss)
         measure_prediction(train_predict, train_labels, 'Train')
+        self.train_writer.add_summary(self.sess.run(self.merged_summary))
+
+    def _create_summaries(self):
+        for (layer, _) in enumerate(self.layer_sizes):
+            print("Start visualize features on layer %d" % (layer + 1))
+            layer_weight = tf.transpose(self.params['w%d' % layer])
+            x_min = tf.reduce_min(layer_weight)
+            x_max = tf.reduce_max(layer_weight)
+            normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
+
+            num_images = normalized_layer_weight.get_shape()[0].value
+            image_size = normalized_layer_weight.get_shape()[1].value
+            print("%d * %d matrix" % (num_images, image_size))
+            edge = int(np.sqrt(image_size))
+            images = tf.reshape(normalized_layer_weight, [num_images, edge, edge, 1])
+            tf.image_summary('layer%d' % (layer + 1), images, max_images=num_images)
+            tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
+            tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
+            tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
+            mean = tf.reduce_mean(layer_weight)
+            tf.summary.scalar('mean in layer %d' % (layer + 1), mean)
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+            tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
