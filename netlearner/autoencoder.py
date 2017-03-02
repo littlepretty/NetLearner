@@ -77,11 +77,14 @@ class Autoencoder(object):
         x_max = tf.reduce_max(layer_weight)
         normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
 
-        num_images = normalized_layer_weight.get_shape()[0].value
-        image_size = normalized_layer_weight.get_shape()[1].value
-        edge = int(np.sqrt(image_size))
-        images = tf.reshape(normalized_layer_weight, [num_images, edge, edge, 1])
-        tf.image_summary('layer1', images, max_images=num_images)
+        num_neurons = normalized_layer_weight.get_shape()[0].value
+        input_dim = normalized_layer_weight.get_shape()[1].value
+        print("%d * %d matrix" % (num_neurons, input_dim))
+        unit_edge = int(np.sqrt(input_dim))
+        if input_dim == unit_edge * unit_edge:
+            images = tf.reshape(normalized_layer_weight, [num_neurons, unit_edge, unit_edge, 1])
+            tf.image_summary('layer1', images, max_images=num_neurons)
+
         tf.summary.histogram('histogram of layer1 weights', layer_weight)
         tf.summary.scalar('min weight in layer1', x_min)
         tf.summary.scalar('max weight in layer1', x_max)

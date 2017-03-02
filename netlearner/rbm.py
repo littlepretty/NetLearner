@@ -7,12 +7,12 @@ from utils import xavier_init, sample_prob_dist, get_batch, create_dir
 class RestrictedBoltzmannMachine(object):
     def __init__(self, num_visible, num_hidden, batch_size,
                  lr=0.1, trans_func=tf.nn.sigmoid,
-                 restore_dir=None):
+                 restore_dir=None, name='rbm'):
         self.num_visible = num_visible
         self.num_hidden = num_hidden
         self.lr = lr
         self.trans_func = trans_func
-        self.name = "rbm"
+        self.name = name
 
         self.weights = self._initialize_weights()
 
@@ -204,7 +204,7 @@ class RestrictedBoltzmannMachine(object):
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
         # self.save_variables()
-        self.train_writer.add_summary(self.sess.run(self.merged_summary))
+        # self.train_writer.add_summary(self.sess.run(self.merged_summary))
 
     def get_weights(self, name):
         return self.sess.run(self.weights[name])
@@ -223,12 +223,10 @@ class RestrictedBoltzmannMachine(object):
         num_neurons = normalized_layer_weight.get_shape()[0].value
         input_dim = normalized_layer_weight.get_shape()[1].value
         unit_edge = int(np.sqrt(input_dim))
-        edge = int(np.sqrt(num_neurons))
-
         if unit_edge * unit_edge == input_dim:
             weight_by_neuron = tf.reshape(normalized_layer_weight, [num_neurons, unit_edge, unit_edge, 1])
             tf.image_summary('v2h', weight_by_neuron, max_images=num_neurons)
-            tf.image_summary('all0', tf.zeros([1, edge, edge, 1]))
+            # tf.image_summary('all 0 is black image', tf.zeros([1, edge, edge, 1]))
 
         tf.summary.histogram('histogram of visible to hidden layer weights', layer_weight)
         tf.summary.scalar('min weight', x_min)

@@ -29,7 +29,7 @@ class StackedRBM(object):
         input_size = self.feature_size
         for i, hidden_size in enumerate(self.rbm_layer_sizes):
             rbm = RestrictedBoltzmannMachine(input_size, hidden_size, rbm_batch_size,
-                                             self.rbm_lr, self.rbm_trans_func)
+                                             self.rbm_lr, self.rbm_trans_func, name='rbm%d' % i)
             input_size = hidden_size
             self.rbms.append(rbm)
 
@@ -45,10 +45,10 @@ class StackedRBM(object):
         self.predict = None
         self.sess = None
 
-    def run_pretrain(self, train_dataset, batch_sizes, num_steps):
+    def run_pretrain(self, train_dataset, train_labels, batch_sizes, num_steps):
         input_data = train_dataset
         for i, rbm in enumerate(self.rbms):
-            rbm.train(input_data, batch_sizes[i], num_steps[i])
+            rbm.train_with_labels(input_data, train_labels, batch_sizes[i], num_steps[i])
             hrand = np.random.random((input_data.shape[0], rbm.num_hidden))
             input_data = rbm.encode_dataset(input_data, hrand)
 
@@ -188,6 +188,6 @@ class StackedRBM(object):
 
     def train(self, train_dataset, train_labels, rbm_batch_sizes, rbm_num_steps,
               ft_batch_size, ft_num_steps, ft_keep_prob=0.72):
-        self.run_pretrain(train_dataset, rbm_batch_sizes, rbm_num_steps)
+        self.run_pretrain(train_dataset, train_labels, rbm_batch_sizes, rbm_num_steps)
         self.unrolling()
         self.run_fine_tuning(train_dataset, train_labels, ft_batch_size, ft_num_steps, ft_keep_prob)
