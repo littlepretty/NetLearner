@@ -20,14 +20,15 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 num_samples = train_dataset.shape[0]
 feature_size = train_dataset.shape[1]
-num_hidden_sizes = [720, 360, 512, 1024]
+num_hidden_sizes = [800, 1024]
 num_labels = train_labels.shape[1]
-srbm = StackedRBM(feature_size, num_hidden_sizes, num_labels)
+srbm = StackedRBM(feature_size, num_hidden_sizes, num_labels,
+                  ft_reg_factor=0.0, ft_lr=0.6)
 
-batch_sizes = [800, 800, 800, 800]
-num_steps = [160000, 160000, 160000, 160000]
-ft_batch_size = 400
-ft_num_steps = 160000
+batch_sizes = [200, 200]
+num_steps = [8000, 8000]
+ft_batch_size = 240
+ft_num_steps = 1000
 srbm.train(train_dataset, train_labels, batch_sizes, num_steps,
            ft_batch_size, ft_num_steps)
 test_predict = srbm.make_prediction(test_dataset)

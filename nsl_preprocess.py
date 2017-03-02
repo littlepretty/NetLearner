@@ -3,6 +3,7 @@
 from __future__ import print_function
 import csv
 import os
+import sys
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 # import argparse
@@ -136,37 +137,6 @@ enc = OneHotEncoder()
 encoder_fitted = False
 
 
-def load_traffic_less_dim(filename, traffic_map=category_map, show=6):
-    """Each row  of all_traffic is a traffic record"""
-    all_traffics = list()
-    with open(filename, 'rb') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        seen = set()
-        for row in reader:
-            try:
-                # Ignore difficulty level and 19th feature,
-                # which is a constant zero
-                row = row[:-1]
-                traffic = row[0:19] + row[20:]
-                traffic[1] = protocol_types[row[1]]
-                traffic[2] = service_types[row[2]]
-                traffic[3] = flag_types[row[3]]
-                attack = row[-1]
-
-                category = attack_category_map[attack]
-                traffic[-1] = traffic_map[category]
-                traffic = [float(r) for r in traffic]
-                all_traffics.append(traffic)
-                if category not in seen and show > 0:
-                    print(category, ' traffic')
-                    show -= 1
-                    seen.add(category)
-            except KeyError as e:
-                print('Cannot parse record %s:', e)
-
-    return np.array(all_traffics)
-
-
 def load_traffic(filename, traffic_map=category_map, show=6):
     """Each row  of all_traffic is a traffic record"""
     global encoder_fitted
@@ -179,16 +149,22 @@ def load_traffic(filename, traffic_map=category_map, show=6):
         seen = set()
         for row in reader:
             try:
-                # Ignore the 19th feature, which is a constant zero
                 # Ignore difficulty level
                 row = row[:-1]
                 attack = row[-1]
+                row = row[0:-1]
                 row[1] = protocol_types[row[1]]
                 row[2] = service_types[row[2]]
                 row[3] = flag_types[row[3]]
-
-                numerical_features.append(row[0:1] + row[4:19] + row[20:-1])
-                symbolic_features.append(row[1:4])
+                row[6] = land_types[row[6]]
+                row[11] = login_types[row[11]]
+                row[20] = host_login_types[row[20]]
+                row[21] = guest_login_types[row[21]]
+                # Ignore the 19th feature, which is a constant zero
+                numerical_features.append(row[0:1] + row[4:6] + row[7:11] +
+                                          row[12:18] + row[22:])
+                symbolic_features.append(row[1:4] + row[6:7] + row[11:12] +
+                                         row[20:22])
 
                 category = attack_category_map[attack]
                 labels.append(traffic_map[category])
@@ -198,13 +174,15 @@ def load_traffic(filename, traffic_map=category_map, show=6):
                     show -= 1
                     seen.add(category)
             except KeyError as e:
-                print('Cannot parse record %s:', e)
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                print('Cannot parse %s at line %d' % (e, exc_tb.tb_lineno))
 
     part1 = np.array(numerical_features, dtype=float)
 
     if encoder_fitted is False:
         enc.fit(symbolic_features)
         encoder_fitted = True
+        print('Symbolic feature sizes: ', enc.n_values_)
 
     encoded = enc.transform(symbolic_features).toarray()
     print('One-Hot Encoded symbolic features: ', encoded.shape)
@@ -247,7 +225,7 @@ def shuffle_dataset_with_label(matrix, contain_label=True):
         return matrix, None
 
 
-def maybe_npsave(dataname, data, l, r, force=False, binary_label=False):
+def maybe_npsave(dataname, data, l, r, force=False):
     if binary_label:
         dataname = dataname + '_bin'
     filename = dataname + '.npy'
@@ -265,13 +243,13 @@ def generate_train_valid_dataset(dataset, labels, percent=1.0, size=''):
     num_traffics = int(dataset.shape[0] * percent)
     left = 0
     right = int(0.9 * num_traffics)
-    maybe_npsave('NSL-KDD/train_dataset' + size, dataset, left, right)
-    maybe_npsave('NSL-KDD/train_ref' + size, labels, left, right)
+    maybe_npsave('NSLKDD/train_dataset' + size, dataset, left, right)
+    maybe_npsave('NSLKDD/train_ref' + size, labels, left, right)
 
     left = right
     right = num_traffics
-    maybe_npsave('NSL-KDD/valid_dataset' + size, dataset, left, right)
-    maybe_npsave('NSL-KDD/valid_ref' + size, labels, left, right)
+    maybe_npsave('NSLKDD/valid_dataset' + size, dataset, left, right)
+    maybe_npsave('NSLKDD/valid_ref' + size, labels, left, right)
 
     # train_dataset = dataset[:int(0.8 * num_traffics), :]
     # train_labels = labels[:int(0.8 * num_traffics), :]
@@ -284,28 +262,28 @@ def generate_train_valid_dataset(dataset, labels, percent=1.0, size=''):
 def generate_test_dataset(dataset, labels, size=''):
     num_traffics = dataset.shape[0]
     print('Testing', dataset.shape, labels.shape)
-    maybe_npsave('NSL-KDD/test_dataset' + size, dataset, 0, num_traffics)
-    maybe_npsave('NSL-KDD/test_ref' + size, labels, 0, num_traffics)
+    maybe_npsave('NSLKDD/test_dataset' + size, dataset, 0, num_traffics)
+    maybe_npsave('NSLKDD/test_ref' + size, labels, 0, num_traffics)
 
 
 def generate_datasets():
     global num_classes
-    train = 'NSL-KDD/KDDTrain+.txt'
+    train = 'NSLKDD/KDDTrain+.txt'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix = load_traffic_less_dim(train, binary_map)
+        data_matrix = load_traffic(train, binary_map)
     else:
         num_classes = len(category_map)
         data_matrix = load_traffic(train)
     dataset, labels = shuffle_dataset_with_label(data_matrix)
     generate_train_valid_dataset(dataset, labels)
 
-    test = 'NSL-KDD/KDDTest+.txt'
+    test = 'NSLKDD/KDDTest+.txt'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix = load_traffic_less_dim(test, binary_map)
+        data_matrix = load_traffic(test, binary_map)
     else:
         num_classes = len(category_map)
         data_matrix = load_traffic(test)

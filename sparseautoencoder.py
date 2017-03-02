@@ -19,15 +19,16 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 feature_size = train_dataset.shape[1]
-encoder_size = 500
-encoder_lr = 0.0008
-lambta = 0.003
+encoder_size = 484
+encoder_lr = 0.02
+lambta = 0.01
 beta = 1
 autoencoder = SparseAutoencoder(feature_size, encoder_size,
-                                encoder_lr, l2_weight=lambta,
+                                encode_lr=encoder_lr,
                                 sparsity_weight=beta)
-batch_size = 300
-num_steps = 100000
+batch_size = 240
+num_steps = 9001
+# autoencoder.train(train_dataset, batch_size, num_steps)
 autoencoder.train_with_labels(train_dataset, train_labels,
                               batch_size, num_steps)
 test_loss = autoencoder.calc_reconstruct_loss(test_dataset)

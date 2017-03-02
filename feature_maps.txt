@@ -4,4 +4,6 @@
 
 11 flag types:  {'OTH': 4, 'RSTR': 8, 'S3': 3, 'S2': 1, 'S1': 2, 'S0': 7, 'RSTOS0': 9, 'REJ': 5, 'SH': 10, 'RSTO': 6, 'SF': 0}
 
+8 bool types: land, login, host_login, guest_login
+
 40 target types:  {'guess_passwd': 6, 'spy': 21, 'named': 24, 'ftp_write': 12, 'processtable': 33, 'nmap': 17, 'back': 13, 'multihop': 18, 'rootkit': 22, 'udpstorm': 30, 'snmpguess': 39, 'pod': 7, 'apache2': 29, 'sqlattack': 38, 'portsweep': 9, 'ps': 34, 'httptunnel': 35, 'sendmail': 27, 'snmpgetattack': 23, 'perl': 3, 'ipsweep': 10, 'teardrop': 8, 'satan': 15, 'loadmodule': 2, 'buffer_overflow': 1, 'mailbomb': 37, 'mscan': 32, 'saint': 28, 'normal': 0, 'xterm': 31, 'phf': 16, 'warezmaster': 19, 'imap': 14, 'warezclient': 20, 'land': 11, 'neptune': 4, 'worm': 36, 'xlock': 25, 'smurf': 5, 'xsnoop': 26}

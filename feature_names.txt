@@ -1,44 +1,44 @@
-duration: continuous.
-protocol_type: symbolic.
-service: symbolic.
-flag: symbolic.
-src_bytes: continuous.
-dst_bytes: continuous.
-land: symbolic.
-wrong_fragment: continuous.
-urgent: continuous.
-hot: continuous.
-num_failed_logins: continuous.
-logged_in: symbolic.
-num_compromised: continuous.
-root_shell: continuous.
-su_attempted: continuous.
-num_root: continuous.
-num_file_creations: continuous.
-num_shells: continuous.
-num_access_files: continuous.
-num_outbound_cmds: continuous. (this feature is always zero)
-is_host_login: symbolic.
-is_guest_login: symbolic.
-count: continuous.
-srv_count: continuous.
-serror_rate: continuous.
-srv_serror_rate: continuous.
-rerror_rate: continuous.
-srv_rerror_rate: continuous.
-same_srv_rate: continuous.
-diff_srv_rate: continuous.
-srv_diff_host_rate: continuous.
-dst_host_count: continuous.
-dst_host_srv_count: continuous.
-dst_host_same_srv_rate: continuous.
-dst_host_diff_srv_rate: continuous.
-dst_host_same_src_port_rate: continuous.
-dst_host_srv_diff_host_rate: continuous.
-dst_host_serror_rate: continuous.
-dst_host_srv_serror_rate: continuous.
-dst_host_rerror_rate: continuous.
-dst_host_srv_rerror_rate: continuous.
+0 duration: continuous.
+1 protocol_type: symbolic.
+2 service: symbolic.
+3 flag: symbolic.
+4 src_bytes: continuous.
+5 dst_bytes: continuous.
+6 land: symbolic.
+7 wrong_fragment: continuous.
+8 urgent: continuous.
+9 hot: continuous.
+10 num_failed_logins: continuous.
+11 logged_in: symbolic.
+12 num_compromised: continuous.
+13 root_shell: continuous.
+14 su_attempted: continuous.
+15 num_root: continuous.
+16 num_file_creations: continuous.
+17 num_shells: continuous.
+18 num_access_files: continuous.
+19 num_outbound_cmds: continuous. (this feature is always zero)
+20 is_host_login: symbolic.
+21 is_guest_login: symbolic.
+22 count: continuous.
+23 srv_count: continuous.
+24 serror_rate: continuous.
+25 srv_serror_rate: continuous.
+26 rerror_rate: continuous.
+27 srv_rerror_rate: continuous.
+28 same_srv_rate: continuous.
+29 diff_srv_rate: continuous.
+30 srv_diff_host_rate: continuous.
+31 dst_host_count: continuous.
+32 dst_host_srv_count: continuous.
+33 dst_host_same_srv_rate: continuous.
+34 dst_host_diff_srv_rate: continuous.
+35 dst_host_same_src_port_rate: continuous.
+36 dst_host_srv_diff_host_rate: continuous.
+37 dst_host_serror_rate: continuous.
+38 dst_host_srv_serror_rate: continuous.
+39 dst_host_rerror_rate: continuous.
+40 dst_host_srv_rerror_rate: continuous.
 
 Example:
 0,tcp,http,SF,221,383,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,7,23,0.00,0.00,0.00,0.00,1.00,0.00,0.17,30,255,1.00,0.00,0.03,0.01,0.00,0.00,0.00,0.00,normal.

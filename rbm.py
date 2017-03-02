@@ -18,10 +18,10 @@ print('Test set', test_dataset.shape)
 
 num_samples = train_dataset.shape[0]
 feature_size = train_dataset.shape[1]
-num_hidden_rbm = 640
+num_hidden_rbm = 1600
 rbm_lr = 0.8
-batch_size = 400
-num_steps = 160000
+batch_size = 240
+num_steps = 10000
 rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
                                  batch_size, rbm_lr)
 print('Restricted Boltzmann Machine built')
