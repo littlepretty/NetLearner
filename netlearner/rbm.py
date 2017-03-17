@@ -40,9 +40,9 @@ class RestrictedBoltzmannMachine(object):
         # measure the goodness of the weights
         self.goodness = self._create_goodness()
 
-        self.train_writer = tf.summary.FileWriter('%s/train' % self.name)
-        self._create_summaries()
-        self.merged_summary = tf.summary.merge_all()
+        # self.train_writer = tf.summary.FileWriter('%s/train' % self.name)
+        # self._create_summaries()
+        # self.merged_summary = tf.summary.merge_all()
 
         self.sess = tf.Session()
         self.saver = tf.train.Saver(self.weights)

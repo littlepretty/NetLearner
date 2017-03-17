@@ -19,13 +19,13 @@ hidden_layer_sizes = [1024]
 mp_classifier = MultilayerPerceptron(feature_size,
                                      hidden_layer_sizes, num_labels,
                                      trans_func=tf.nn.relu,
-                                     init_learning_rate=0.32,
+                                     init_learning_rate=0.36,
                                      beta=0.0)
 batch_size = 240
 num_steps = 6000
 mp_classifier.train_with_bias(encoded_train_dataset,
                               train_labels, batch_size, num_steps,
-                              keep_prob=1.0)
+                              keep_prob=0.2)
 test_predict = mp_classifier.make_prediction(encoded_test_dataset)
 test_accuracy = accuracy(test_predict, test_labels)
 measure_prediction(test_predict, test_labels, 'Test')

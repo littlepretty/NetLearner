@@ -2,6 +2,7 @@ from __future__ import print_function
 import numpy as np
 from netlearner.utils import min_max_normalize, maybe_npsave
 from netlearner.rbm import RestrictedBoltzmannMachine
+import tensorflow as tf
 
 
 raw_train_dataset = np.load('NSLKDD/train_dataset.npy')
@@ -18,12 +19,12 @@ print('Test set', test_dataset.shape)
 
 num_samples = train_dataset.shape[0]
 feature_size = train_dataset.shape[1]
-num_hidden_rbm = 1600
-rbm_lr = 0.8
+num_hidden_rbm = 625
+rbm_lr = 0.2
 batch_size = 240
 num_steps = 10000
 rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
-                                 batch_size, rbm_lr)
+                                 batch_size, rbm_lr, trans_func=tf.nn.relu)
 print('Restricted Boltzmann Machine built')
 # rbm.train(train_dataset, batch_size, num_steps)
 rbm.train_with_labels(train_dataset, train_labels, batch_size, num_steps)

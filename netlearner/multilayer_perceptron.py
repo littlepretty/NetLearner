@@ -35,9 +35,9 @@ class MultilayerPerceptron(object):
 
         self.predict = tf.nn.softmax(self.final_logits)
 
-        self.train_writer = tf.summary.FileWriter('mlp/train')
-        self._create_summaries()
-        self.merged_summary = tf.summary.merge_all()
+        # self.train_writer = tf.summary.FileWriter('mlp/train')
+        # self._create_summaries()
+        # self.merged_summary = tf.summary.merge_all()
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -183,7 +183,7 @@ class MultilayerPerceptron(object):
         train_predict = self.make_prediction(train_dataset)
         print("Trainset total loss: %f" % train_loss)
         measure_prediction(train_predict, train_labels, 'Train')
-        self.train_writer.add_summary(self.sess.run(self.merged_summary))
+        # self.train_writer.add_summary(self.sess.run(self.merged_summary))
 
     def _create_summaries(self):
         for (layer, _) in enumerate(self.layer_sizes):

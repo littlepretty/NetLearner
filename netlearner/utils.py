@@ -64,9 +64,9 @@ def correct_percentage(matrix):
     """
     epsilon = 1e-26
     num_classes = matrix.shape[0]
-    precision = [matrix[i][i] / (np.sum(matrix[i, :]) + epsilon)
+    recall = [matrix[i][i] / (np.sum(matrix[i, :]) + epsilon)
                  for i in range(num_classes)]
-    recall = [matrix[i][i] / (np.sum(matrix[:, i]) + epsilon)
+    precision = [matrix[i][i] / (np.sum(matrix[:, i]) + epsilon)
               for i in range(num_classes)]
     fscore = [2 * precision[i] * recall[i] / (precision[i] + recall[i] + epsilon)
               for i in range(len(precision))]
