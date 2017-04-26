@@ -131,6 +131,7 @@ attack_category_map = {'normal': 'normal', 'back': 'dos',
                        'sqlattack': 'probe',
                        'worm': 'probe'}
 # If category_map[x] != 0, then x is a type of attack
+label_names = ['normal', 'probe', 'dos', 'u2r', 'r2l']
 category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
 enc = OneHotEncoder()
@@ -190,6 +191,10 @@ def load_traffic(filename, traffic_map=category_map, show=6):
     all_traffics = np.concatenate((part1, part2), axis=1)
 
     labels = np.array(labels, dtype=int)[np.newaxis]
+
+    for (i, name) in enumerate(label_names):
+        print('#%s = %d' % (name,  np.sum(labels == i)))
+
     labels = labels.T
     all_traffics = np.concatenate((all_traffics, labels), axis=1)
 
@@ -225,7 +230,7 @@ def shuffle_dataset_with_label(matrix, contain_label=True):
         return matrix, None
 
 
-def maybe_npsave(dataname, data, l, r, force=False):
+def maybe_npsave(dataname, data, l, r, force=True):
     if binary_label:
         dataname = dataname + '_bin'
     filename = dataname + '.npy'
@@ -277,6 +282,7 @@ def generate_datasets():
         num_classes = len(category_map)
         data_matrix = load_traffic(train)
     dataset, labels = shuffle_dataset_with_label(data_matrix)
+    print(dataset[500:503, :])
     generate_train_valid_dataset(dataset, labels)
 
     test = 'NSLKDD/KDDTest+.txt'
@@ -292,7 +298,8 @@ def generate_datasets():
 
 
 if __name__ == '__main__':
+    np.set_printoptions(precision=4)
     binary_label = False
     generate_datasets()
-    binary_label = True
-    generate_datasets()
+    # binary_label = True
+    # generate_datasets()
