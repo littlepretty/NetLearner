@@ -1,31 +1,35 @@
-from __future__ import print_function
+from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
-from netlearner.utils import accuracy, measure_prediction
 from netlearner.multilayer_perceptron import MultilayerPerceptron
+from math import ceil
 
-encoded_train_dataset = np.load('encoded_trainset.rbm.npy')
+encoder_name = 'RBM'
+np.random.seed(5678)
+tf.set_random_seed(5678)
+train_dataset = np.load('trainset.' + encoder_name + '.npy')
 train_labels = np.load('NSLKDD/train_ref.npy')
+valid_dataset = np.load('validset.' + encoder_name + '.npy')
 valid_labels = np.load('NSLKDD/valid_ref.npy')
-train_labels = np.concatenate((train_labels, valid_labels), axis=0)
-encoded_test_dataset = np.load('encoded_testset.rbm.npy')
+test_dataset = np.load('testset.' + encoder_name + '.npy')
 test_labels = np.load('NSLKDD/test_ref.npy')
 
-# use encoded traning and testing data
-num_samples = encoded_train_dataset.shape[0]
-feature_size = encoded_train_dataset.shape[1]
+num_samples, feature_size = train_dataset.shape
 num_labels = train_labels.shape[1]
-hidden_layer_sizes = [1024]
-mp_classifier = MultilayerPerceptron(feature_size,
-                                     hidden_layer_sizes, num_labels,
-                                     trans_func=tf.nn.relu,
-                                     init_learning_rate=0.36,
-                                     beta=0.0)
-batch_size = 240
-num_steps = 6000
-mp_classifier.train_with_bias(encoded_train_dataset,
-                              train_labels, batch_size, num_steps,
-                              keep_prob=0.2)
-test_predict = mp_classifier.make_prediction(encoded_test_dataset)
-test_accuracy = accuracy(test_predict, test_labels)
-measure_prediction(test_predict, test_labels, 'Test')
+hidden_layer_sizes = []
+mp = MultilayerPerceptron(feature_size, hidden_layer_sizes, num_labels,
+                          trans_func=tf.nn.sigmoid,
+                          optimizer=tf.train.AdamOptimizer,
+                          beta=0.000, name='MLPUse%s' % encoder_name)
+batch_size = 5000
+num_epochs = 100
+num_steps = ceil(train_dataset.shape[0] / batch_size * num_epochs)
+init_lr = 0.01
+mp.train_with_labels(train_dataset, train_labels,
+                     batch_size, int(num_steps), init_lr,
+                     valid_dataset, valid_labels,
+                     test_dataset, test_labels,
+                     keep_prob=0.8)
+f = open(mp.dirname + '/test.log')
+print(f.read())
+f.close()
