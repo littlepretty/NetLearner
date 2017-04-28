@@ -78,7 +78,7 @@ class RestrictedBoltzmannMachine(object):
 
     def _create_goodness(self):
         association = tf.matmul(tf.transpose(self.v), self.encode)
-        neg_energy = tf.reduce_mean(tf.mul(self.weights['w'], association))
+        neg_energy = tf.reduce_mean(tf.multiply(self.weights['w'], association))
         return neg_energy
 
     def sample_visible_from_hidden(self, hidden):
@@ -113,23 +113,23 @@ class RestrictedBoltzmannMachine(object):
         pos_association = tf.matmul(tf.transpose(self.v), pos_hprob)
         neg_association = tf.matmul(tf.transpose(neg_vprob), neg_hprob)
 
-        gradient_w = tf.sub(pos_association, neg_association) / self.batch_size
+        gradient_w = tf.subtract(pos_association, neg_association) / self.batch_size
         update_w = tf.assign_add(self.weights['w'], self.lr * gradient_w)
 
-        g_bh = self.lr * tf.reduce_mean(tf.sub(pos_hprob, neg_hprob), 0)
+        g_bh = self.lr * tf.reduce_mean(tf.subtract(pos_hprob, neg_hprob), 0)
         update_bh = tf.assign_add(self.weights['bh'], g_bh)
 
-        g_bv = self.lr * tf.reduce_mean(tf.sub(self.v, neg_vprob), 0)
+        g_bv = self.lr * tf.reduce_mean(tf.subtract(self.v, neg_vprob), 0)
         update_bv = tf.assign_add(self.weights['bv'], g_bv)
 
         # mean squared error
-        loss = 0.5 * tf.reduce_sum(tf.square(tf.sub(neg_vprob, self.v)))
+        loss = 0.5 * tf.reduce_sum(tf.square(tf.subtract(neg_vprob, self.v)))
 
         # return [loss, update_w]
         return [loss, update_w, update_bh, update_bv]
 
     def _create_reconstruct_loss(self):
-        loss = 0.5 * tf.reduce_sum(tf.square(tf.sub(self.reconstruct, self.v)))
+        loss = 0.5 * tf.reduce_sum(tf.square(tf.subtract(self.reconstruct, self.v)))
         return loss
 
     def run_train_step(self, V, lr):
@@ -268,8 +268,8 @@ class RestrictedBoltzmannMachine(object):
         visible units weights, suggested by Hinton's paper
         """
         weight_by_neuron = tf.reshape(normalized_layer_weight, [self.num_hidden, self.num_visible, 1, 1])
-        tf.image_summary('h2v weights', weight_by_neuron, max_images=16)
-        # tf.image_summary('all 0 is black image', tf.zeros([1, self.num_visible, 1, 1]))
+        tf.summary.image('h2v weights', weight_by_neuron, max_outputs=16)
+        # tf.summary.image('all 0 is black image', tf.zeros([1, self.num_visible, 1, 1]))
 
         tf.summary.histogram('histogram of visible to hidden layer weights', layer_weight)
         tf.summary.histogram('histogram of visible to hidden layer biases', self.weights['bv'])

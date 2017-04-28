@@ -74,7 +74,7 @@ class MultilayerPerceptron(object):
         regterm = reg_func([0.0])
         for (i, hsize) in enumerate(self.layer_sizes):
             regterm = tf.add(regterm, reg_func(self.params['w%d' % i]))
-        return tf.mul(beta, regterm)
+        return tf.multiply(beta, regterm)
 
     def fit(self, X, T, lr, prob=0.5):
         opt, loss, reg = self.sess.run(
@@ -228,7 +228,7 @@ class MultilayerPerceptron(object):
             input_dim = normalized_layer_weight.get_shape()[1].value
             print("%d * %d matrix" % (num_neurons, input_dim))
             images = tf.reshape(normalized_layer_weight, [num_neurons, input_dim, 1, 1])
-            tf.image_summary('layer%d' % (layer + 1), images, max_images=16)
+            tf.summry.image('layer%d' % (layer + 1), images, max_outputs=16)
 
             tf.summary.scalar('layer %d size' % (layer + 1), size)
             tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)

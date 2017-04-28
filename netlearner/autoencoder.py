@@ -69,7 +69,7 @@ class Autoencoder(object):
         return tf.add(tf.matmul(self.encode, self.weights['w2']), self.weights['b2'])
 
     def _create_reconstruction_loss_node(self):
-        reconstruction_loss = 0.5 * tf.reduce_sum(tf.pow(tf.sub(self.reconstruction, self.x), 2.0))
+        reconstruction_loss = 0.5 * tf.reduce_sum(tf.pow(tf.subtract(self.reconstruction, self.x), 2.0))
         return reconstruction_loss
 
     def _create_kl_node(self):
@@ -91,7 +91,7 @@ class Autoencoder(object):
         input_dim = normalized_layer_weight.get_shape()[0].value
         print("%d * %d matrix" % (num_neurons, input_dim))
         images = tf.reshape(normalized_layer_weight, [num_neurons, input_dim, 1, 1])
-        tf.image_summary('layer1', images, max_images=16)
+        tf.summary.image('layer1', images, max_outputs=16)
 
         tf.summary.histogram('layer1 weights', layer_weight)
         tf.summary.histogram('activity', self.encode)
@@ -245,7 +245,7 @@ class SparseAutoencoder(Autoencoder):
         cross_entropy = tf.reduce_sum(tf.multiply(sparsity_vector, -tf.log(activity)))
         entropy = tf.reduce_sum(tf.multiply(sparsity_vector, -tf.log(tf.transpose(sparsity_vector))))
 
-        return tf.sub(cross_entropy, entropy)
+        return tf.subtract(cross_entropy, entropy)
 
     def _create_loss_node(self):
         return tf.add(self.reconstruction_loss, self.kl_divergence * self.sparsity_weight)
@@ -259,7 +259,7 @@ class MaskNoiseAutoencoder(Autoencoder):
             mask_fraction=mask_fraction, name=name)
 
     def _create_encode_node(self):
-        mask = tf.mul(self.keep_prob, tf.nn.dropout(self.x, self.keep_prob))
+        mask = tf.multiply(self.keep_prob, tf.nn.dropout(self.x, self.keep_prob))
         logits = tf.add(tf.matmul(mask, self.weights['w1']), self.weights['b1'])
         return self.transfer_func(logits)
 
