@@ -20,17 +20,19 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 num_samples = train_dataset.shape[0]
 feature_size = train_dataset.shape[1]
-num_hidden_sizes = [800, 1024]
+rbm_layer_sizes = [400, 400]
 num_labels = train_labels.shape[1]
-srbm = StackedRBM(feature_size, num_hidden_sizes, num_labels,
-                  ft_reg_factor=0.0, ft_lr=0.6)
-
+srbm = StackedRBM(feature_size, rbm_layer_sizes, num_labels,
+                  ft_reg_factor=0.0, ft_lr=0.2)
 batch_sizes = [200, 200]
-num_steps = [8000, 8000]
+num_steps = [100, 100]
 ft_batch_size = 240
-ft_num_steps = 1000
+ft_num_steps = 8000
 srbm.train(train_dataset, train_labels, batch_sizes, num_steps,
            ft_batch_size, ft_num_steps)
-test_predict = srbm.make_prediction(test_dataset)
-test_accuracy = accuracy(test_predict, test_labels)
-measure_prediction(test_predict, test_labels, 'Test')
+encoded_train_dataset = srbm.encode_dataset(train_dataset)
+encoded_test_dataset = srbm.encode_dataset(test_dataset)
+print('Encoded training set', encoded_train_dataset.shape)
+print('Encoded test set', encoded_test_dataset.shape)
+np.save('trainset.srbm.npy', encoded_train_dataset)
+np.save('testset.srbm.npy', encoded_test_dataset)

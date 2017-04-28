@@ -73,7 +73,13 @@ print('PCA reconstruction loss on Training data: %f '
 print('PCA reconstruction loss on Test data: %f '
       % reconstruct_error(test_dataset, re_teX))
 plot_2d_scatter(trX, trY, 'PCA on Training')
-plot_2d_scatter(teX, teY, 'PCA on Testing')
+
+total_size = teX.shape[0]
+sample_index = np.random.choice(total_size,
+                                size=int(0.1 * total_size), replace=False)
+teX = teX[sample_index, :]
+teY = np.argmax(test_labels[sample_index], 1)
+plot_2d_scatter(teX, teY, 'PCA on Sampled Testing')
 
 
 def autoencode_dataset(train_dataset, test_dataset):
@@ -92,10 +98,10 @@ def autoencode_dataset(train_dataset, test_dataset):
     return [encoded_train_dataset, encoded_test_dataset]
 
 
-[encoded_train_dataset, encoded_test_dataset] = autoencode_dataset(
-    train_dataset, test_dataset)
-plot_2d_scatter(encoded_train_dataset, trY, 'Autoencoder on Training')
-plot_2d_scatter(encoded_test_dataset, teY, 'Autoencoder on Testing')
+# [encoded_train_dataset, encoded_test_dataset] = autoencode_dataset(
+    # train_dataset, test_dataset)
+# plot_2d_scatter(encoded_train_dataset, trY, 'Autoencoder on Training')
+# plot_2d_scatter(encoded_test_dataset, teY, 'Autoencoder on Testing')
 
 
 def rbm_dataset(train_dataset, test_dataset):
