@@ -163,7 +163,7 @@ def load_traffic(filename, traffic_map=category_map, show=6):
                 row[21] = guest_login_types[row[21]]
                 # Ignore the 19th feature, which is a constant zero
                 numerical_features.append(row[0:1] + row[4:6] + row[7:11] +
-                                          row[12:18] + row[22:])
+                                          row[12:19] + row[22:41])
                 symbolic_features.append(row[1:4] + row[6:7] + row[11:12] +
                                          row[20:22])
 
@@ -183,11 +183,13 @@ def load_traffic(filename, traffic_map=category_map, show=6):
     if encoder_fitted is False:
         enc.fit(symbolic_features)
         encoder_fitted = True
-        print('Symbolic feature sizes: ', enc.n_values_)
+    print('Numeric feature size: ', part1.shape[1])
 
     encoded = enc.transform(symbolic_features).toarray()
     print('One-Hot Encoded symbolic features: ', encoded.shape)
     part2 = np.array(encoded, dtype=float)
+    print('Symbolic feature sizes: ', enc.n_values_, part2.shape)
+
     all_traffics = np.concatenate((part1, part2), axis=1)
 
     labels = np.array(labels, dtype=int)[np.newaxis]
@@ -198,7 +200,7 @@ def load_traffic(filename, traffic_map=category_map, show=6):
     labels = labels.T
     all_traffics = np.concatenate((all_traffics, labels), axis=1)
 
-    print('Traffic data: ', all_traffics.shape)
+    print('Traffic data with label: ', all_traffics.shape)
     return all_traffics
 
 

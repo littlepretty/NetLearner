@@ -228,7 +228,7 @@ class MultilayerPerceptron(object):
             input_dim = normalized_layer_weight.get_shape()[1].value
             print("%d * %d matrix" % (num_neurons, input_dim))
             images = tf.reshape(normalized_layer_weight, [num_neurons, input_dim, 1, 1])
-            tf.summry.image('layer%d' % (layer + 1), images, max_outputs=16)
+            tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
 
             tf.summary.scalar('layer %d size' % (layer + 1), size)
             tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
@@ -246,3 +246,6 @@ class MultilayerPerceptron(object):
         # tf.summary.scalar('valid loss', self.valid_loss_record)
         tf.summary.scalar('valid accuracy', self.valid_accuracy_record)
         tf.summary.scalar('test accuracy', self.test_accuracy_record)
+
+    def get_weights(self, name='w0'):
+        return self.sess.run(self.params[name])

@@ -31,7 +31,7 @@ mp_classifier = MultilayerPerceptron(feature_size, hidden_layer_sizes,
                                      trans_func=tf.nn.relu,
                                      name='PureMLP')
 batch_size = 100
-num_epochs = 5
+num_epochs = 80
 num_steps = ceil(train_dataset.shape[0] / batch_size * num_epochs)
 init_lr = 0.1
 mp_classifier.train_with_labels(train_dataset, train_labels,
@@ -41,3 +41,5 @@ mp_classifier.train_with_labels(train_dataset, train_labels,
 f = open(mp_classifier.dirname + '/test.log')
 print(f.read())
 f.close()
+weights = mp_classifier.get_weights('w0')
+np.save(mp_classifier.dirname + '/w0.npy', weights)
