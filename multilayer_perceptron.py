@@ -27,31 +27,31 @@ feature_size = train_dataset.shape[1]
 num_labels = train_labels.shape[1]
 
 batch_size = 100
-num_epochs = 100
+num_epochs = 80
 num_steps = ceil(train_dataset.shape[0] / batch_size * num_epochs)
-init_lrs = [0.1, 0.05, 0.01]
-hidden_layer_sizes = [[40], [80], [120], [160], [200],
-                      [200, 160], [160, 120], [120, 80], [80, 40],
-                      [200, 160, 120], [160, 120, 80], [120, 80, 40],
-                      [200, 160, 120, 80], [160, 120, 80, 40],
-                      [200, 160, 120, 80, 40]]
-keep_probs = [0.8, 0.5, 0.2]
+init_lrs = [0.001]
+hidden_layer_sizes = [# [40], [80], [120], [160], [200],
+                      # [200, 160], [160, 120], [120, 80], [80, 40],
+                      # [200, 160, 120], [160, 120, 80], [120, 80, 40],
+                      [200, 160, 120, 80],
+                      [160, 120, 80, 40]]
+keep_prob = 0.64
 for hidden_layer_size in hidden_layer_sizes:
     for init_lr in init_lrs:
-        for keep_prob in keep_probs:
-
-            mp_classifier = MultilayerPerceptron(feature_size,
-                                                 hidden_layer_size,
-                                                 num_labels, beta=0.000,
-                                                 trans_func=tf.nn.relu,
-                                                 name='PureMLP')
-            mp_classifier.train_with_labels(train_dataset, train_labels,
-                                            batch_size, int(num_steps),
-                                            init_lr, valid_dataset,
-                                            valid_labels, test_dataset,
-                                            test_labels, keep_prob=keep_prob)
-            f = open(mp_classifier.dirname + '/test.log')
-            print(f.read())
-            f.close()
-            weights = mp_classifier.get_weights('w0')
-            np.save(mp_classifier.dirname + '/w0.npy', weights)
+        mp_classifier = MultilayerPerceptron(feature_size,
+                                             hidden_layer_size,
+                                             num_labels, beta=0.000,
+                                             trans_func=tf.nn.relu,
+                                             optimizer=tf.train.AdamOptimizer,
+                                             name='PureMLP')
+        mp_classifier.train_with_labels(train_dataset, train_labels,
+                                        batch_size, int(num_steps),
+                                        init_lr, valid_dataset,
+                                        valid_labels, test_dataset,
+                                        test_labels, keep_prob)
+        f = open(mp_classifier.dirname + '/test.log')
+        print(f.read())
+        f.close()
+        # weights = mp_classifier.get_weights('w0')
+        # np.save(mp_classifier.dirname + '/w0.npy', weights)
+        mp_classifier.exit()

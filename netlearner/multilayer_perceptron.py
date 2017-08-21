@@ -26,7 +26,8 @@ class MultilayerPerceptron(object):
 
         self.final_logits = self._create_forward()
         self.classify_loss = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(self.final_logits, self.t))
+            tf.nn.softmax_cross_entropy_with_logits(logits=self.final_logits,
+                                                    labels=self.t))
         self.regterm = self._create_regterm(reg_func, beta)
 
         self.loss = self.classify_loss + self.regterm
@@ -37,8 +38,8 @@ class MultilayerPerceptron(object):
         time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
         self.dirname = name + '/Run-' + time_str
         self.train_writer = tf.summary.FileWriter(self.dirname)
-        self._create_summaries()
-        self.merged_summary = tf.summary.merge_all()
+        # self._create_summaries()
+        # self.merged_summary = tf.summary.merge_all()
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -65,8 +66,8 @@ class MultilayerPerceptron(object):
                 activity = self.trans_func(logits)
                 next_input = tf.nn.dropout(activity, self.keep_prob)
             else:
-                next_input = tf.nn.sigmoid(logits)
-                print('Last layer is usually sigmoid activation')
+                next_input = logits  # tf.nn.sigmoid(logits)
+                print('Last layer is softmax(logits)')
 
         return next_input
 
@@ -76,10 +77,43 @@ class MultilayerPerceptron(object):
             regterm = tf.add(regterm, reg_func(self.params['w%d' % i]))
         return tf.multiply(beta, regterm)
 
+    def _create_summaries(self):
+        tf.summary.scalar('input dimension', self.feature_size)
+        for (layer, size) in enumerate(self.layer_sizes):
+            print("Start visualize features on layer %d" % (layer + 1))
+            layer_weight = tf.transpose(self.params['w%d' % layer])
+            x_min = tf.reduce_min(layer_weight)
+            x_max = tf.reduce_max(layer_weight)
+            normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
+
+            num_neurons = normalized_layer_weight.get_shape()[0].value
+            input_dim = normalized_layer_weight.get_shape()[1].value
+            print("%d * %d matrix" % (num_neurons, input_dim))
+            images = tf.reshape(normalized_layer_weight, [num_neurons, input_dim, 1, 1])
+            tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
+
+            tf.summary.scalar('layer %d size' % (layer + 1), size)
+            tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
+            # tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
+            # tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
+            # mean = tf.reduce_mean(layer_weight)
+            # tf.summary.scalar('mean in layer %d' % (layer + 1), mean)
+            # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+            # tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
+
+        tf.summary.scalar('learning rate', self.learning_rate)
+        tf.summary.scalar('dropout keep probability', self.keep_prob)
+        # tf.summary.scalar('regularization loss', self.regterm_record)
+        tf.summary.scalar('train accuracy', self.train_accuracy_record)
+        # tf.summary.scalar('valid loss', self.valid_loss_record)
+        tf.summary.scalar('valid accuracy', self.valid_accuracy_record)
+        tf.summary.scalar('test accuracy', self.test_accuracy_record)
+
     def fit(self, X, T, lr, prob=0.5):
-        opt, loss, reg = self.sess.run(
-            [self.optimizer, self.loss, self.regterm],
-            feed_dict={self.x: X, self.t: T, self.keep_prob: prob, self.learning_rate: lr})
+        opt, loss, reg = self.sess.run([self.optimizer, self.loss, self.regterm],
+                                       feed_dict={self.x: X, self.t: T,
+                                                  self.keep_prob: prob,
+                                                  self.learning_rate: lr})
         return loss, reg
 
     def make_prediction(self, X):
@@ -94,39 +128,26 @@ class MultilayerPerceptron(object):
                                         self.keep_prob: prob})
         return loss
 
-    def train(self, train_dataset, train_labels, batch_size, num_steps, keep_prob=0.5):
-        display_step = num_steps / 10
-        print('Training for %d steps' % num_steps)
+    def make_summary(self, train_accu, valid_loss, valid_accu, test_accu, lr, keep_prob, step):
+        summaries = self.sess.run(self.merged_summary,
+                                  feed_dict={self.keep_prob: keep_prob,
+                                             self.train_accuracy_record: train_accu,
+                                             self.valid_loss_record: valid_loss,
+                                             self.valid_accuracy_record: valid_accu,
+                                             self.test_accuracy_record: test_accu,
+                                             self.learning_rate: lr})
+        self.train_writer.add_summary(summaries, step)
 
-        for step in range(num_steps):
-            offset = (batch_size * step) % train_labels.shape[0]
-            end = (offset + batch_size) % train_labels.shape[0]
-            if end < offset:
-                batch_data = np.concatenate((train_dataset[offset:, :],
-                                             train_dataset[:end, :]), axis=0)
-                batch_labels = np.concatenate((train_labels[offset:, :],
-                                               train_labels[:end, :]), axis=0)
-            else:
-                batch_data = train_dataset[offset:(offset + batch_size), :]
-                batch_labels = train_labels[offset:(offset + batch_size), :]
+    def get_weights(self, name='w0'):
+        return self.sess.run(self.params[name])
 
-            loss, reg = self.fit(batch_data, batch_labels, keep_prob)
-            if step % display_step == 0:
-                print("Minibatch %d-%d loss at step %d:\t%f(regterm=%f)"
-                      % (offset, end, step, loss, reg))
-                batch_predict = self.make_prediction(batch_data)
-                print("Minibatch train accuracy: %f%%" %
-                      accuracy(batch_predict, batch_labels))
-
-        print('Multilayer Perceptron trained')
-        train_loss = self.calc_total_loss(train_dataset, train_labels)
-        train_predict = self.make_prediction(train_dataset)
-        print("Trainset total loss: %f" % train_loss)
-        measure_prediction(train_predict, train_labels, 'Train')
+    def exit(self):
+        self.sess.close()
 
     def train_with_labels(self, train_dataset, train_labels, batch_size,
                           num_steps, init_lr,
-                          valid_dataset, valid_labels, test_dataset, test_labels, keep_prob=0.5):
+                          valid_dataset, valid_labels,
+                          test_dataset, test_labels, keep_prob=0.8):
         display_step = num_steps // 10
         summary_step = num_steps // 100
         print('Training for %d steps' % num_steps)
@@ -170,23 +191,19 @@ class MultilayerPerceptron(object):
             loss, reg = self.fit(batch_data, batch_labels, lr, keep_prob)
 
             if step != 0 and step % summary_step == 0:
+                train_predict = self.make_prediction(train_dataset)
+                train_accu = accuracy(train_predict, train_labels)
                 valid_predict = self.make_prediction(valid_dataset)
                 valid_loss, valid_reg = self.sess.run([self.loss, self.regterm],
                                                       feed_dict={self.x: valid_dataset,
                                                                  self.t: valid_labels,
                                                                  self.keep_prob: keep_prob,
                                                                  self.learning_rate: lr})
-                train_predict = self.make_prediction(train_dataset)
-                train_accu = accuracy(train_predict, train_labels)
                 valid_accu = accuracy(valid_predict, valid_labels)
-                summaries = self.sess.run(self.merged_summary,
-                                          feed_dict={self.keep_prob: keep_prob,
-                                                     self.train_accuracy_record: train_accu,
-                                                     self.valid_loss_record: valid_loss,
-                                                     self.valid_accuracy_record: valid_accu,
-                                                     self.test_accuracy_record: 0.0,
-                                                     self.learning_rate: lr})
-                self.train_writer.add_summary(summaries, step)
+                test_predict = self.make_prediction(test_dataset)
+                test_accu = accuracy(test_predict, test_labels)
+                # self.make_summary(train_accu, valid_loss, valid_accu, test_accu,
+                                  # lr, keep_prob, stpes)
 
             if step != 0 and step % display_step == 0:
                 batch_predict = self.make_prediction(batch_data)
@@ -197,55 +214,20 @@ class MultilayerPerceptron(object):
                 print("Validation accuracy: %f%%" % accuracy(valid_predict, valid_labels))
 
         print('Multilayer Perceptron trained')
+
         train_loss = self.calc_total_loss(train_dataset, train_labels)
-        train_predict = self.make_prediction(train_dataset)
         print("Trainset total loss: %f" % train_loss)
+        train_predict = self.make_prediction(train_dataset)
+        train_accu = accuracy(train_predict, train_labels)
         measure_prediction(train_predict, train_labels, self.dirname, 'Train')
+
         valid_predict = self.make_prediction(valid_dataset)
+        valid_accu = accuracy(valid_predict, valid_labels)
         measure_prediction(valid_predict, valid_labels, self.dirname, 'Valid')
+
         test_predict = self.make_prediction(test_dataset)
-        measure_prediction(test_predict, test_labels, self.dirname, 'Test')
         test_accu = accuracy(test_predict, test_labels)
-        summaries = self.sess.run(self.merged_summary,
-                                  feed_dict={self.keep_prob: keep_prob,
-                                             self.train_accuracy_record: train_accu,
-                                             self.valid_loss_record: valid_loss,
-                                             self.valid_accuracy_record: valid_accu,
-                                             self.test_accuracy_record: test_accu,
-                                             self.learning_rate: lr})
-        self.train_writer.add_summary(summaries, num_steps)
+        measure_prediction(test_predict, test_labels, self.dirname, 'Test')
 
-    def _create_summaries(self):
-        tf.summary.scalar('input dimension', self.feature_size)
-        for (layer, size) in enumerate(self.layer_sizes):
-            print("Start visualize features on layer %d" % (layer + 1))
-            layer_weight = tf.transpose(self.params['w%d' % layer])
-            x_min = tf.reduce_min(layer_weight)
-            x_max = tf.reduce_max(layer_weight)
-            normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
-
-            num_neurons = normalized_layer_weight.get_shape()[0].value
-            input_dim = normalized_layer_weight.get_shape()[1].value
-            print("%d * %d matrix" % (num_neurons, input_dim))
-            images = tf.reshape(normalized_layer_weight, [num_neurons, input_dim, 1, 1])
-            tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
-
-            tf.summary.scalar('layer %d size' % (layer + 1), size)
-            tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
-            # tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
-            # tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
-            # mean = tf.reduce_mean(layer_weight)
-            # tf.summary.scalar('mean in layer %d' % (layer + 1), mean)
-            # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
-            # tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
-
-        tf.summary.scalar('learning rate', self.learning_rate)
-        tf.summary.scalar('dropout keep probability', self.keep_prob)
-        # tf.summary.scalar('regularization loss', self.regterm_record)
-        tf.summary.scalar('train accuracy', self.train_accuracy_record)
-        # tf.summary.scalar('valid loss', self.valid_loss_record)
-        tf.summary.scalar('valid accuracy', self.valid_accuracy_record)
-        tf.summary.scalar('test accuracy', self.test_accuracy_record)
-
-    def get_weights(self, name='w0'):
-        return self.sess.run(self.params[name])
+        # self.make_summary(train_accu, valid_loss, valid_accu, test_accu,
+                          # lr, keep_prob, num_stpes)
