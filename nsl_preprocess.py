@@ -194,14 +194,16 @@ def load_traffic(filename, traffic_map=category_map, show=6):
 
     labels = np.array(labels, dtype=int)[np.newaxis]
 
+    dist = []
     for (i, name) in enumerate(label_names):
         print('#%s = %d' % (name,  np.sum(labels == i)))
+        dist.append(np.where(labels == i)[1])
 
     labels = labels.T
     all_traffics = np.concatenate((all_traffics, labels), axis=1)
 
     print('Traffic data with label: ', all_traffics.shape)
-    return all_traffics
+    return all_traffics, dist
 
 
 def one_hot_encoding(labels):
@@ -223,54 +225,78 @@ def shuffle_dataset_with_label(matrix, contain_label=True):
     if contain_label:
         dataset = matrix[:, :-1]
         labels = matrix[:, -1]
-
         print('Convert label to one-hot-encoding...')
         labels = one_hot_encoding(labels)
-        print(labels[:4, :])
         return dataset, labels
     else:
         return matrix, None
 
 
-def maybe_npsave(dataname, data, l, r, force=True):
+def split_dataset_with_label(matrix):
+    # matrix size is N by F
+    # N = #records and F = #features +1 because it containing label
+    dataset = matrix[:, :-1]
+    labels = matrix[:, -1]
+    print('Convert label to one-hot-encoding...')
+    labels = one_hot_encoding(labels)
+    return dataset, labels
+
+
+def maybe_npsave(dataname, data, force=True):
     if binary_label:
         dataname = dataname + '_bin'
     filename = dataname + '.npy'
     if os.path.exists(filename) and not force:
         print('%s already exists - Skip saving.' % filename)
     else:
-        save_data = data[l:r, :]
         print('Writing %s to %s...' % (dataname, filename))
-        np.save(filename, save_data)
+        np.save(filename, data)
         print('Finish saving ', dataname)
     return filename
 
 
-def generate_train_valid_dataset(dataset, labels, percent=1.0, size=''):
-    num_traffics = int(dataset.shape[0] * percent)
-    left = 0
-    right = int(0.9 * num_traffics)
-    maybe_npsave('NSLKDD/train_dataset' + size, dataset, left, right)
-    maybe_npsave('NSLKDD/train_ref' + size, labels, left, right)
+def generate_train_dataset(dataset, labels, size=''):
+    maybe_npsave('NSLKDD/train_dataset' + size, dataset)
+    maybe_npsave('NSLKDD/train_ref' + size, labels)
 
-    left = right
-    right = num_traffics
-    maybe_npsave('NSLKDD/valid_dataset' + size, dataset, left, right)
-    maybe_npsave('NSLKDD/valid_ref' + size, labels, left, right)
-
-    # train_dataset = dataset[:int(0.8 * num_traffics), :]
-    # train_labels = labels[:int(0.8 * num_traffics), :]
-    # valid_dataset = dataset[int(0.8 * num_traffics):, :]
-    # valid_labels = labels[int(0.8 * num_traffics):, :]
-
-    print('Training + Validation', dataset.shape, labels.shape)
+    print('Training', dataset.shape, labels.shape)
 
 
-def generate_test_dataset(dataset, labels, size=''):
-    num_traffics = dataset.shape[0]
-    print('Testing', dataset.shape, labels.shape)
-    maybe_npsave('NSLKDD/test_dataset' + size, dataset, 0, num_traffics)
-    maybe_npsave('NSLKDD/test_ref' + size, labels, 0, num_traffics)
+def generate_valid_test_dataset(dataset, labels, dist, percent=0.9, size=''):
+    print('Original Test dataset ', dataset.shape, labels.shape)
+
+    test_dataset = np.ndarray(shape=(0, dataset.shape[1]))
+    test_label = np.ndarray(shape=(0, labels.shape[1]))
+    valid_dataset = np.ndarray(shape=(0, dataset.shape[1]))
+    valid_label = np.ndarray(shape=(0, labels.shape[1]))
+
+    for (i, indices) in enumerate(dist):
+        num_traffics = int(len(indices) * percent)
+
+        print('Traffic %s in dataset: %s' % (label_names[i],
+                                             dataset[indices, :].shape))
+
+        test_indices = indices[0: num_traffics]
+
+        test_dataset = np.concatenate((test_dataset, dataset[test_indices, :]),
+                                      axis=0)
+        test_label = np.concatenate((test_label, labels[test_indices, :]),
+                                    axis=0)
+
+        valid_indices = indices[num_traffics:]
+        valid_dataset = np.concatenate(
+            (valid_dataset, dataset[valid_indices, :]),
+            axis=0)
+        valid_label = np.concatenate((valid_label, labels[valid_indices, :]),
+                                     axis=0)
+
+    print('Test dataset ', test_dataset.shape, test_label.shape)
+    maybe_npsave('NSLKDD/test_dataset' + size, test_dataset)
+    maybe_npsave('NSLKDD/test_ref' + size, test_label)
+
+    print('Valid dataset ', valid_dataset.shape, valid_label.shape)
+    maybe_npsave('NSLKDD/valid_dataset' + size, valid_dataset)
+    maybe_npsave('NSLKDD/valid_ref' + size, valid_label)
 
 
 def generate_datasets():
@@ -279,24 +305,25 @@ def generate_datasets():
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix = load_traffic(train, binary_map)
+        data_matrix, dist = load_traffic(train, binary_map)
     else:
         num_classes = len(category_map)
-        data_matrix = load_traffic(train)
+        data_matrix, dist = load_traffic(train)
+
     dataset, labels = shuffle_dataset_with_label(data_matrix)
-    print(dataset[500:503, :])
-    generate_train_valid_dataset(dataset, labels)
+    generate_train_dataset(dataset, labels)
 
     test = 'NSLKDD/KDDTest+.txt'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix = load_traffic(test, binary_map)
+        data_matrix, dist = load_traffic(test, binary_map)
     else:
         num_classes = len(category_map)
-        data_matrix = load_traffic(test)
-    dataset, labels = shuffle_dataset_with_label(data_matrix)
-    generate_test_dataset(dataset, labels)
+        data_matrix, dist = load_traffic(test)
+
+    dataset, labels = split_dataset_with_label(data_matrix)
+    generate_valid_test_dataset(dataset, labels, dist)
 
 
 if __name__ == '__main__':

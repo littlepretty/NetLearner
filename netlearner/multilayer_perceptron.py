@@ -65,8 +65,8 @@ class MultilayerPerceptron(object):
                 activity = self.trans_func(logits)
                 next_input = tf.nn.dropout(activity, self.keep_prob)
             else:
-                next_input = logits
-                print('Last layer is just linear logistic')
+                next_input = tf.nn.sigmoid(logits)
+                print('Last layer is usually sigmoid activation')
 
         return next_input
 
