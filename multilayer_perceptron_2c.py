@@ -1,40 +1,73 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from netlearner.utils import accuracy, measure_prediction
-from netlearner.utils import min_max_normalize
+from netlearner.utils import hyperparameter_summary
+from netlearner.utils import min_max_scale
 from netlearner.multilayer_perceptron import MultilayerPerceptron
+from math import ceil
 
+raw_train_dataset = np.load('UNSW/train_dataset.npy')
+train_labels = np.load('UNSW/train_labels_bin.npy')
+raw_valid_dataset = np.load('UNSW/valid_dataset.npy')
+valid_labels = np.load('UNSW/valid_labels_bin.npy')
+raw_test_dataset = np.load('UNSW/test_dataset.npy')
+test_labels = np.load('UNSW/test_labels_bin.npy')
 
-raw_train_dataset = np.load('NSLKDD/train_dataset_bin.npy')
-train_labels = np.load('NSLKDD/train_ref_bin.npy')
-raw_valid_dataset = np.load('NSLKDD/valid_dataset_bin.npy')
-valid_labels = np.load('NSLKDD/valid_ref_bin.npy')
-raw_test_dataset = np.load('NSLKDD/test_dataset_bin.npy')
-test_labels = np.load('NSLKDD/test_ref_bin.npy')
-
-[train_dataset, valid_dataset, test_dataset] = min_max_normalize(
+[train_dataset, valid_dataset, test_dataset] = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
 perm = np.random.permutation(train_dataset.shape[0])
 train_dataset = train_dataset[perm, :]
 train_labels = train_labels[perm, :]
+perm = np.random.permutation(test_dataset.shape[0])
+test_dataset = test_dataset[perm, :]
+test_labels = test_labels[perm, :]
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Validation set', valid_dataset.shape, valid_labels.shape)
 print('Test set', test_dataset.shape, test_labels.shape)
 
 num_samples, feature_size = train_dataset.shape
 num_labels = train_labels.shape[1]
-hidden_layer_sizes = [64, 51]
-mp_classifier = MultilayerPerceptron(feature_size, hidden_layer_sizes,
-                                     num_labels, beta=0.000,
-                                     trans_func=tf.nn.relu,
-                                     name='PureMLP2C')
-batch_size = 100
-num_steps = 80000
-init_lr = 0.4
-mp_classifier.train_with_labels(
-    train_dataset, train_labels, batch_size, num_steps, init_lr,
-    valid_dataset, valid_labels, keep_prob=0.6)
-test_predict = mp_classifier.make_prediction(test_dataset)
-test_accuracy = accuracy(test_predict, test_labels)
-measure_prediction(test_predict, test_labels, 'Test')
+batch_size = 40
+keep_prob = 0.80
+beta = 0.000
+weights = [1.0, 100.0]
+num_epochs = [60]
+init_lrs = [0.001]
+hidden_layer_sizes = [
+                      [400, 200],
+                      # [800, 640], [160, 80], [80, 40],
+                      # [400, 360, 320],
+                      # [160, 120, 80], [120, 80, 40],
+                      ]
+for hidden_layer_size in hidden_layer_sizes:
+    for init_lr in init_lrs:
+        for num_epoch in num_epochs:
+            num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
+            mp_classifier = MultilayerPerceptron(feature_size,
+                                                 hidden_layer_size,
+                                                 num_labels, beta=beta,
+                                                 trans_func=tf.nn.relu,
+                                                 optimizer=tf.train.AdamOptimizer,
+                                                 class_weights=weights,
+                                                 name='PureMLP-UNSW2C')
+            mp_classifier.train_with_labels(train_dataset, train_labels,
+                                            batch_size, int(num_steps), init_lr,
+                                            valid_dataset, valid_labels,
+                                            test_dataset, test_labels,
+                                            keep_prob)
+            hyperparameter = {'hidden_layer_size': hidden_layer_size,
+                              'init_lr': init_lr,
+                              'num_epochs': num_epoch,
+                              'num_steps': num_steps,
+                              'regularization beta': beta,
+                              'optimizer': 'AdamOptimizer',
+                              'keep_prob': keep_prob,
+                              'act_func': 'RELU',
+                              'class_weights': weights,
+                              'batch_size': batch_size, }
+            hyperparameter_summary(mp_classifier.dirname,
+                                   hyperparameter)
+            f = open(mp_classifier.dirname + '/test.log')
+            print(f.read())
+            f.close()
+            mp_classifier.exit()

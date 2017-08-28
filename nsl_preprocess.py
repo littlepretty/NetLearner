@@ -262,37 +262,27 @@ def generate_train_dataset(dataset, labels, size=''):
     print('Training', dataset.shape, labels.shape)
 
 
-def generate_valid_test_dataset(dataset, labels, dist, percent=0.9, size=''):
+def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, size=''):
     print('Original Test dataset ', dataset.shape, labels.shape)
-
-    test_dataset = np.ndarray(shape=(0, dataset.shape[1]))
-    test_label = np.ndarray(shape=(0, labels.shape[1]))
     valid_dataset = np.ndarray(shape=(0, dataset.shape[1]))
     valid_label = np.ndarray(shape=(0, labels.shape[1]))
 
     for (i, indices) in enumerate(dist):
-        num_traffics = int(len(indices) * percent)
-
         print('Traffic %s in dataset: %s' % (label_names[i],
                                              dataset[indices, :].shape))
-
-        test_indices = indices[0: num_traffics]
-
-        test_dataset = np.concatenate((test_dataset, dataset[test_indices, :]),
-                                      axis=0)
-        test_label = np.concatenate((test_label, labels[test_indices, :]),
-                                    axis=0)
-
-        valid_indices = indices[num_traffics:]
+        num_traffics = int(len(indices) * percent)
+        shuffled_indices = np.random.permutation(indices)
+        valid_indices = shuffled_indices[0: num_traffics]
         valid_dataset = np.concatenate(
             (valid_dataset, dataset[valid_indices, :]),
             axis=0)
-        valid_label = np.concatenate((valid_label, labels[valid_indices, :]),
+        valid_label = np.concatenate((valid_label,
+                                      labels[valid_indices, :]),
                                      axis=0)
 
-    print('Test dataset ', test_dataset.shape, test_label.shape)
-    maybe_npsave('NSLKDD/test_dataset' + size, test_dataset)
-    maybe_npsave('NSLKDD/test_ref' + size, test_label)
+    print('Test dataset ', dataset.shape, labels.shape)
+    maybe_npsave('NSLKDD/test_dataset' + size, dataset)
+    maybe_npsave('NSLKDD/test_ref' + size, labels)
 
     print('Valid dataset ', valid_dataset.shape, valid_label.shape)
     maybe_npsave('NSLKDD/valid_dataset' + size, valid_dataset)

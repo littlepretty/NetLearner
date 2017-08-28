@@ -94,8 +94,10 @@ class StackedRBM(object):
 
         self.reconstruct, self.encode = self._create_unrolled_network()
         #self.finetune_loss = tf.reduce_mean(
-        #    tf.nn.softmax_cross_entropy_with_logits(self.reconstruct, self.ft_target))
-        self.finetune_loss = 0.5 * tf.reduce_mean(tf.pow(tf.sub(self.reconstruct, self.ft_target), 2.0))
+        #    tf.nn.softmax_cross_entropy_with_logits(logits=self.reconstruct,
+        #    labels=self.ft_target))
+        self.finetune_loss = 0.5 * tf.reduce_mean(tf.pow(tf.sub(self.reconstruct, self.ft_target),
+                                                         2.0))
         self.ft_regterm = self._create_regterm()
         self.ft_loss = self.finetune_loss + self.ft_regterm
         self.optimizer = self.ft_optimizer(self.ft_lr).minimize(self.ft_loss)

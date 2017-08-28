@@ -127,7 +127,30 @@ def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
         log.close()
 
 
-def maybe_npsave(dataname, data, l, r, force=False, binary_label=False):
+def hyperparameter_summary(dirname, hyperparameter):
+    f = open(dirname + '/test.log', 'a')
+    f.write('\n******* Hyperparameter Summary *******\n')
+    for (key, val) in hyperparameter.items():
+        f.write('%s = %s\n' % (key, str(val)))
+
+    f.write('**************************************\n')
+    f.close()
+
+
+def maybe_npsave(dataname, data, force=True, binary_label=False):
+    if binary_label:
+        dataname = dataname + '_bin'
+    filename = dataname + '.npy'
+    if os.path.exists(filename) and not force:
+        print('%s already exists - Skip saving.' % filename)
+    else:
+        print('Writing %s to %s...' % (dataname, filename))
+        np.save(filename, data)
+        print('Finish saving %s to %s' % (dataname, filename))
+    return filename
+
+
+def maybe_npsave_range(dataname, data, l, r, force=False, binary_label=False):
     if binary_label:
         dataname += '_bin'
     filename = dataname + '.npy'
@@ -137,7 +160,7 @@ def maybe_npsave(dataname, data, l, r, force=False, binary_label=False):
         save_data = data[l:r, :]
         print('Writing %s to %s...' % (dataname, filename))
         np.save(filename, save_data)
-        print('Finish saving ', dataname)
+        print('Finish saving %s to %s' % (dataname, filename))
     return filename
 
 

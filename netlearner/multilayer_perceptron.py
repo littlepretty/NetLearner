@@ -7,7 +7,8 @@ from time import localtime, strftime
 
 class MultilayerPerceptron(object):
     def __init__(self, feature_size, hidden_layer_sizes, num_labels,
-                 trans_func=tf.nn.relu, reg_func=tf.nn.l2_loss, beta=0.009,
+                 beta=0.009, trans_func=tf.nn.relu,
+                 reg_func=tf.nn.l2_loss, class_weights=None,
                  optimizer=tf.train.GradientDescentOptimizer, name='mlp'):
         self.feature_size = feature_size
         self.layer_sizes = hidden_layer_sizes + [num_labels]
@@ -25,9 +26,7 @@ class MultilayerPerceptron(object):
         self.test_accuracy_record = tf.placeholder(tf.float32, name='test_accu')
 
         self.final_logits = self._create_forward()
-        self.classify_loss = tf.reduce_mean(
-            tf.nn.softmax_cross_entropy_with_logits(logits=self.final_logits,
-                                                    labels=self.t))
+        self.classify_loss = self._create_classify_loss(class_weights)
         self.regterm = self._create_regterm(reg_func, beta)
 
         self.loss = self.classify_loss + self.regterm
@@ -76,6 +75,23 @@ class MultilayerPerceptron(object):
         for (i, hsize) in enumerate(self.layer_sizes):
             regterm = tf.add(regterm, reg_func(self.params['w%d' % i]))
         return tf.multiply(beta, regterm)
+
+    def _create_classify_loss(self, class_weights):
+        if class_weights is None:
+            class_weights = np.ones(shape=(1, self.num_labels))
+
+        # prob_dist = tf.nn.softmax(self.final_logits)
+        # cross_entropy = tf.multiply(self.t * tf.log(prob_dist), c)
+        # classify_loss = tf.reduce_mean(-tf.reduce_sum(cross_entropy,
+                                                      # reduction_indices=[1]))
+        # square_root_loss = tf.reduce_mean(
+            # tf.multiply(c, tf.pow(self.t - prob_dist, 2)))
+        c = tf.constant(class_weights, dtype=tf.float32)
+        cross_entropy = tf.nn.weighted_cross_entropy_with_logits(logits=self.final_logits,
+                                                                 targets=self.t,
+                                                                 pos_weight=c)
+        classify_loss = tf.reduce_mean(cross_entropy)
+        return classify_loss
 
     def _create_summaries(self):
         tf.summary.scalar('input dimension', self.feature_size)
@@ -207,10 +223,12 @@ class MultilayerPerceptron(object):
 
             if step != 0 and step % display_step == 0:
                 batch_predict = self.make_prediction(batch_data)
+                train_predict = self.make_prediction(train_dataset)
                 valid_predict = self.make_prediction(valid_dataset)
                 print("Minibatch(%d cases) loss at step %d: %.6f(regterm=%.4f, lr=%.6f)"
                       % (batch_labels.shape[0], step, loss, reg, lr))
                 print("Minibatch train accuracy: %f%%" % accuracy(batch_predict, batch_labels))
+                print("Trainset accuracy: %f%%" % accuracy(train_predict, train_labels))
                 print("Validation accuracy: %f%%" % accuracy(valid_predict, valid_labels))
 
         print('Multilayer Perceptron trained')
