@@ -27,11 +27,11 @@ num_samples = train_dataset.shape[0]
 feature_size = train_dataset.shape[1]
 num_labels = train_labels.shape[1]
 
-batch_size = 40
+batch_size = 80
 keep_prob = 0.8
 num_epochs = [40]
 init_lrs = [0.001]
-weights = [1.0, 20.0, 5.0, 1000.0, 200.0]
+weights = [1.0, 20.0, 5.0, 100.0, 80.0]
 beta = 0.000
 hidden_layer_sizes = [[400],
                       # [40], [80], [160], [200],

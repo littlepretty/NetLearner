@@ -26,7 +26,8 @@ class MultilayerPerceptron(object):
         self.test_accuracy_record = tf.placeholder(tf.float32, name='test_accu')
 
         self.final_logits = self._create_forward()
-        self.classify_loss = self._create_classify_loss(class_weights)
+        # self.classify_loss = self._create_classify_loss(class_weights)
+        self.classify_loss = self.weighted_softmax_cross_entropy_with_logits(class_weights)
         self.regterm = self._create_regterm(reg_func, beta)
 
         self.loss = self.classify_loss + self.regterm
@@ -75,6 +76,14 @@ class MultilayerPerceptron(object):
         for (i, hsize) in enumerate(self.layer_sizes):
             regterm = tf.add(regterm, reg_func(self.params['w%d' % i]))
         return tf.multiply(beta, regterm)
+
+    def weighted_softmax_cross_entropy_with_logits(self, class_weights):
+        sum_exp_power = tf.reduce_sum(tf.exp(self.final_logits),
+                                      axis=1, keep_dims=True)
+        cross_entropy_part1 = -self.t * self.final_logits * class_weights
+        cross_entropy_part2 = self.t * class_weights * tf.log(sum_exp_power)
+        cross_entropy = cross_entropy_part1 + cross_entropy_part2
+        return tf.reduce_mean(cross_entropy)
 
     def _create_classify_loss(self, class_weights):
         if class_weights is None:

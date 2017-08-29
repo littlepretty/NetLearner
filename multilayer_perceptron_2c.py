@@ -27,14 +27,14 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 num_samples, feature_size = train_dataset.shape
 num_labels = train_labels.shape[1]
-batch_size = 40
+batch_size = 80
 keep_prob = 0.80
-beta = 0.000
+beta = 0.0001
 weights = [1.0, 100.0]
-num_epochs = [60]
+num_epochs = [10]
 init_lrs = [0.001]
 hidden_layer_sizes = [
-                      [400, 200],
+                      [400],
                       # [800, 640], [160, 80], [80, 40],
                       # [400, 360, 320],
                       # [160, 120, 80], [120, 80, 40],
