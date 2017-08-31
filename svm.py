@@ -53,21 +53,46 @@ def accuracy(y, target):
     return float(np.sum(y == target)) / float(target.shape[0])
 
 
-def compute_classification_table(predictions, labels, dirname, dataset):
+def compute_classification_table(predictions, labels, dirname, dataset,
+                                 hyperparameter=None, print_hyper=False):
     num_classes = labels.shape[1]
     class_table = np.zeros((num_classes, num_classes))
     actual_class = np.argmax(labels, 1)
     for (a, p) in zip(actual_class, predictions):
         class_table[a][p] += 1
 
-    headers = [str(i) for i in range(labels.shape[1])]
-    print(tabulate(class_table, headers))
+    e = 1e-26
+    recall = [class_table[i][i] / (np.sum(class_table[i, :]) + e)
+              for i in range(num_classes)]
+    precision = [class_table[i][i] / (np.sum(class_table[:, i]) + e)
+                 for i in range(num_classes)]
+    fscore = [2.0 * precision[i] * recall[i] / (precision[i] + recall[i])
+              for i in range(num_classes)]
+    headers1 = [str(i) for i in range(num_classes)]
+    headers2 = ['Class'] + [str(i) for i in range(num_classes)]
+    row1 = ['Precision'] + ['%.2f' % (p * 100.0) for p in precision]
+    row2 = ['Recall'] + ['%.2f' % (r * 100.0) for r in recall]
+    row3 = ['F1-Score'] + ['%.2f' % (f * 100.0) for f in fscore]
 
-    log = open(dirname + '/performance.log', 'a')
-    log.write('*****************    %s    *******************\n' % dataset)
-    log.write(tabulate(class_table, headers) + '\n')
-    log.write('************************************************\n')
-    log.close
+    accu = accuracy(predictions, np.argmax(labels, 1))
+    log = open(dirname + '/test.log', 'a')
+    log.write('\n*****************    %s    *******************\n' % dataset)
+    log.write('Accuracy: %.6f\n' % accu)
+    log.write(tabulate(class_table, headers1) + '\n')
+    log.write(tabulate([row1, row2, row3], headers2) + '\n')
+    log.write('******************************************************\n')
+    if print_hyper:
+        log.write('\n*********** Hyperparameter Summary ***********\n')
+        for (key, val) in hyperparameter.items():
+            log.write('%s = %s\n' % (key, str(val)))
+
+        log.write('***********************************************\n')
+
+    log.close()
+
+    log = open(dirname + '/test.log', 'r')
+    print(log.read())
+    log.close()
 
     return class_table
 
@@ -81,14 +106,15 @@ def LinearSVM(train_dataset, train_labels,
     clf = svm.LinearSVC(class_weight=binary_class_weight, verbose=False)
     clf.fit(train_dataset, y)
 
+    hyperparameter = {'class_weight': binary_class_weight,
+                      'Linear': 'True'}
     train_prediction = clf.predict(train_dataset)
-    print('Trainset accuracy: %f' % accuracy(train_prediction, y))
-    compute_classification_table(train_prediction, train_labels, 'LinearSVM', 'TRAIN')
-
+    compute_classification_table(train_prediction, train_labels,
+                                 'LinearSVM', 'TRAIN SET')
     test_prediction = clf.predict(test_dataset)
-    test_y = np.argmax(test_labels, 1)
-    print('Testset accuracy: %f' % accuracy(test_prediction, test_y))
-    compute_classification_table(test_prediction, test_labels, 'LinearSVM', 'TEST')
+    compute_classification_table(test_prediction, test_labels,
+                                 'LinearSVM', 'TEST SET',
+                                 hyperparameter, True)
 
 
 def NonLinearSVM(train_dataset, train_labels,
@@ -100,17 +126,19 @@ def NonLinearSVM(train_dataset, train_labels,
     clf = svm.SVC(class_weight=binary_class_weight, verbose=False)
     clf.fit(train_dataset, y)
 
+    hyperparameter = {'class_weight': binary_class_weight,
+                      'Linear': 'False'}
     train_prediction = clf.predict(train_dataset)
-    print('Trainset accuracy: %f' % accuracy(train_prediction, y))
-    compute_classification_table(train_prediction, train_labels, 'NonLinearSVM', 'TRAIN')
-
+    compute_classification_table(train_prediction, train_labels,
+                                 'NonLinearSVM', 'TRAIN SET')
     test_prediction = clf.predict(test_dataset)
-    test_y = np.argmax(test_labels, 1)
-    print('Testset accuracy: %f' % accuracy(test_prediction, test_y))
-    compute_classification_table(test_prediction, test_labels, 'NonLinearSVM', 'TEST')
+    compute_classification_table(test_prediction, test_labels,
+                                 'NonLinearSVM', 'TEST SET',
+                                 hyperparameter, True)
 
 
-# train_dataset, train_labels, valid_dataset, valid_labels, test_dataset, test_labels = load_nsl_dataset()
-train_dataset, train_labels, _, _, test_dataset, test_labels = load_unsw_dataset()
-NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels)
-LinearSVM(train_dataset, train_labels, test_dataset, test_labels)
+if __name__ == '__main__':
+    train_dataset, train_labels, _, _, test_dataset, test_labels = \
+        load_unsw_dataset()
+    NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels)
+    LinearSVM(train_dataset, train_labels, test_dataset, test_labels)
