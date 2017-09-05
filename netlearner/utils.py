@@ -138,15 +138,15 @@ def hyperparameter_summary(dirname, hyperparameter):
 
 
 def maybe_npsave(dataname, data, force=True, binary_label=False):
+    note = ""
     if binary_label:
-        dataname = dataname + '_bin'
+        note = ' as binary lables'
     filename = dataname + '.npy'
     if os.path.exists(filename) and not force:
         print('%s already exists - Skip saving.' % filename)
     else:
-        print('Writing %s to %s...' % (dataname, filename))
         np.save(filename, data)
-        print('Finish saving %s to %s' % (dataname, filename))
+        print('Finish saving %s to %s%s' % (dataname, filename, note))
     return filename
 
 

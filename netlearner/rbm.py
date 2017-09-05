@@ -1,7 +1,7 @@
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-from utils import xavier_init, sample_prob_dist, get_batch, create_dir
+from utils import sample_prob_dist, get_batch, create_dir
 from time import localtime, strftime
 
 
@@ -22,8 +22,10 @@ class RestrictedBoltzmannMachine(object):
         # self.h = tf.placeholder(tf.float32, [None, num_hidden], name='h')
         self.one = tf.placeholder(tf.float32, [None, num_hidden], name='1fe')
 
-        self.vrand = tf.placeholder(tf.float32, [None, num_visible], name='vrand')
-        self.hrand = tf.placeholder(tf.float32, [None, num_hidden], name='hrand')
+        self.vrand = tf.placeholder(tf.float32, [None, num_visible],
+                                    name='vrand')
+        self.hrand = tf.placeholder(tf.float32, [None, num_hidden],
+                                    name='hrand')
         self.avg_tfe = tf.placeholder(tf.float32, name='avg_tfe')
         self.avg_vfe = tf.placeholder(tf.float32, name='avg_vfe')
         self.reconstruct_loss = tf.placeholder(tf.float32, name='rloss')
@@ -64,11 +66,13 @@ class RestrictedBoltzmannMachine(object):
             self.model_dir = 'rbm_models/%dby%d' % (num_visible, num_hidden)
             create_dir('rbm_models')
             self.sess.run(init)
-            print('Model initialized')
+            print('RBM Model built and initialized')
 
     def _initialize_weights(self):
         weights = dict()
-        weights['w'] = tf.Variable(tf.random_normal([self.num_visible, self.num_hidden], 0.0, 0.01),
+        weights['w'] = tf.Variable(tf.random_normal([self.num_visible,
+                                                     self.num_hidden],
+                                                    0.0, 0.01),
                                    name='w')
         weights['bh'] = tf.Variable(tf.zeros(shape=[self.num_hidden],
                                              dtype=tf.float32), name='bh')
@@ -113,7 +117,7 @@ class RestrictedBoltzmannMachine(object):
         pos_association = tf.matmul(tf.transpose(self.v), pos_hprob)
         neg_association = tf.matmul(tf.transpose(neg_vprob), neg_hprob)
 
-        gradient_w = tf.subtract(pos_association, neg_association) / self.batch_size
+        gradient_w = (pos_association - neg_association) / self.batch_size
         update_w = tf.assign_add(self.weights['w'], self.lr * gradient_w)
 
         g_bh = self.lr * tf.reduce_mean(tf.subtract(pos_hprob, neg_hprob), 0)
@@ -129,8 +133,52 @@ class RestrictedBoltzmannMachine(object):
         return [loss, update_w, update_bh, update_bv]
 
     def _create_reconstruct_loss(self):
-        loss = 0.5 * tf.reduce_sum(tf.square(tf.subtract(self.reconstruct, self.v)))
+        loss = 0.5 * tf.reduce_mean(tf.square(self.reconstruct - self.v))
         return loss
+
+    def _create_free_energy(self):
+        first_term = tf.matmul(self.v, tf.reshape(self.weights['bv'],
+                                                  [self.num_visible, 1]))
+        x = tf.exp(tf.matmul(self.v, self.weights['w']))
+        one_plus_x = tf.add(self.one, x)
+        second_term = tf.reduce_sum(tf.log(one_plus_x), 1, keep_dims=True)
+        return -tf.add(first_term, second_term)
+
+    def _create_summaries(self):
+        layer_weight = tf.transpose(self.weights['w'])
+        x_min = tf.reduce_min(layer_weight)
+        x_max = tf.reduce_max(layer_weight)
+        normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
+        """
+        instead of show the visible to hidden weights, record the hidden to
+        visible units weights, suggested by Hinton's paper
+        """
+        weight_by_neuron = tf.reshape(normalized_layer_weight,
+                                      [self.num_hidden, self.num_visible, 1, 1])
+        tf.summary.image('h2v weights', weight_by_neuron, max_outputs=16)
+        # tf.summary.image('all 0 is black image',
+        # tf.zeros([1, self.num_visible, 1, 1]))
+
+        tf.summary.histogram('histogram of visible to hidden weights',
+                             layer_weight)
+        tf.summary.histogram('histogram of visible to hidden biases',
+                             self.weights['bv'])
+        tf.summary.histogram('histogram of hidden to visible biases',
+                             self.weights['bh'])
+        # tf.summary.scalar('min weight', x_min)
+        # tf.summary.scalar('max weight', x_max)
+        # mean = tf.reduce_mean(layer_weight)
+        # tf.summary.scalar('mean weight', mean)
+        # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+        # tf.summary.scalar('stddev weight', stddev)
+        """If valid free energy increase relatively to train free energy,
+        we are overfitting"""
+        tf.summary.scalar('valid FE - train FE', self.avg_vfe - self.avg_tfe)
+        tf.summary.scalar('Train Free Energy(TFE)', self.avg_tfe)
+        tf.summary.scalar('Valid Free Energy(VFE)', self.avg_vfe)
+        tf.summary.scalar('Train reconstruct loss', self.reconstruct_loss)
+        tf.summary.scalar('num hidden units', self.num_hidden)
+        tf.summary.scalar('learning rate', self.lr)
 
     def run_train_step(self, V, lr):
         Vrand = np.random.random([V.shape[0], self.num_visible])
@@ -161,22 +209,18 @@ class RestrictedBoltzmannMachine(object):
                              feed_dict={self.v: V, self.vrand: vrand,
                                         self.hrand: hrand})
 
-    def _create_free_energy(self):
-        first_term = tf.matmul(self.v, tf.reshape(self.weights['bv'], [self.num_visible, 1]))
-        x = tf.exp(tf.matmul(self.v, self.weights['w']))
-        one_plus_x = tf.add(self.one, x)
-        second_term = tf.reduce_sum(tf.log(one_plus_x), 1, keep_dims=True)
-        return -tf.add(first_term, second_term)
-
     def calculate_free_energy(self, V):
-        # use free energy to do classification, with combined data vector and label vector
+        """Use free energy to do classification,
+        with combined data vector and label vector"""
         all_ones = np.ones([V.shape[0], self.num_hidden])
-        return self.sess.run(self.free_energy, feed_dict={self.v: V, self.one: all_ones})
+        return self.sess.run(self.free_energy, feed_dict={self.v: V,
+                                                          self.one: all_ones})
 
     def train(self, train_dataset, num_steps):
         display_steps = num_steps / 10
         for step in range(num_steps):
-            offset = (self.batch_size * step) % (train_dataset.shape[0] - self.batch_size)
+            offset = (self.batch_size * step) % (train_dataset.shape[0] -
+                                                 self.batch_size)
             end = (offset + self.batch_size) % train_dataset.shape[0]
             if end < offset:
                 batch_data = np.concatenate((train_dataset[offset:, :],
@@ -188,15 +232,17 @@ class RestrictedBoltzmannMachine(object):
             if step % display_steps == 0:
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 print("Batch loss at step %d: %f" % (step, l))
-                print("Batch reconstruction loss at step %d: %f" % (step, batch_loss))
+                print("Batch reconstruction loss at step %d: %f" % (step,
+                                                                    batch_loss))
 
         print('Restricted Boltzmann Machine trained')
         train_loss = self.calc_reconstruct_loss(train_dataset)
         print("Trainset reconstruction loss: %f" % train_loss)
 
-    def train_with_labels(self, train_dataset, train_labels, num_steps, valid_dataset, init_lr=0.1):
+    def train_with_labels(self, train_dataset, train_labels, num_steps,
+                          valid_dataset, init_lr=0.1):
         display_step = num_steps // 10
-        summary_step = num_steps // 100
+        summary_step = num_steps // 10
 
         num_labels = train_labels.shape[1]
         print('Training for %d steps' % num_steps)
@@ -213,7 +259,9 @@ class RestrictedBoltzmannMachine(object):
                 # train3 = X[3][np.random.choice(X[3].shape[0], 50), :]
                 train3, label3 = get_batch(X[3], Y[3], step, self.batch_size)
                 train4, label4 = get_batch(X[4], Y[4], step, self.batch_size)
-                batch_data = np.concatenate((train0, train1, train2, train3, train4), axis=0)
+                batch_data = np.concatenate((train0, train1, train2,
+                                             train3, train4),
+                                            axis=0)
             else:
                 train0, label0 = get_batch(X[0], Y[0], step, self.batch_size)
                 train1, label1 = get_batch(X[1], Y[1], step, self.batch_size)
@@ -233,14 +281,17 @@ class RestrictedBoltzmannMachine(object):
                 summary = self.sess.run(self.merged_summary,
                                         feed_dict={self.avg_tfe: avg_tfe,
                                                    self.avg_vfe: avg_vfe,
-                                                   self.reconstruct_loss: batch_loss,
+                                                   self.reconstruct_loss:
+                                                   batch_loss,
                                                    self.lr: lr})
                 self.train_writer.add_summary(summary, step)
-                if step % display_step == 0:
-                    print("Batch loss at step %d: %.6f(lr=%.6f)" % (step, l, lr))
-                    print("Batch reconstruction loss at step %d: %f" % (step, batch_loss))
-                    print("Avg Free Energy Difference Between Validset and Trainset: (%.4f) - (%.4f) = %.4f" %
-                          (avg_vfe, avg_tfe, avg_vfe - avg_tfe))
+
+            if step % display_step == 0:
+                print("Batch loss at step %d: %.6f(lr=%.6f)" % (step, l, lr))
+                print("Batch reconstruction loss at step %d: %f" %
+                      (step, batch_loss))
+                print("Avg Free Energy: Valid(%.4f) - Train(%.4f) = %.4f" %
+                      (avg_vfe, avg_tfe, avg_vfe - avg_tfe))
 
         print('Restricted Boltzmann Machine trained')
         # train_loss = self.calc_reconstruct_loss(train_dataset)
@@ -257,33 +308,3 @@ class RestrictedBoltzmannMachine(object):
     def save_variables(self):
         save_path = self.saver.save(self.sess, self.model_dir)
         print("Model saved to file", save_path)
-
-    def _create_summaries(self):
-        layer_weight = tf.transpose(self.weights['w'])
-        x_min = tf.reduce_min(layer_weight)
-        x_max = tf.reduce_max(layer_weight)
-        normalized_layer_weight = tf.div(layer_weight - x_min, x_max - x_min)
-        """
-        instead of show the visible to hidden weights, record the hidden to
-        visible units weights, suggested by Hinton's paper
-        """
-        weight_by_neuron = tf.reshape(normalized_layer_weight, [self.num_hidden, self.num_visible, 1, 1])
-        tf.summary.image('h2v weights', weight_by_neuron, max_outputs=16)
-        # tf.summary.image('all 0 is black image', tf.zeros([1, self.num_visible, 1, 1]))
-
-        tf.summary.histogram('histogram of visible to hidden layer weights', layer_weight)
-        tf.summary.histogram('histogram of visible to hidden layer biases', self.weights['bv'])
-        tf.summary.histogram('histogram of hidden to visible layer biases', self.weights['bh'])
-        # tf.summary.scalar('min weight', x_min)
-        # tf.summary.scalar('max weight', x_max)
-        # mean = tf.reduce_mean(layer_weight)
-        # tf.summary.scalar('mean weight', mean)
-        # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
-        # tf.summary.scalar('stddev weight', stddev)
-        """if valid free energy increase relatively to train free energy, we are overfitting"""
-        tf.summary.scalar('valid FE - train FE', self.avg_vfe - self.avg_tfe)
-        tf.summary.scalar('Train Free Energy(TFE)', self.avg_tfe)
-        tf.summary.scalar('Valid Free Energy(VFE)', self.avg_vfe)
-        tf.summary.scalar('Train reconstruct loss', self.reconstruct_loss)
-        tf.summary.scalar('num hidden units', self.num_hidden)
-        tf.summary.scalar('learning rate', self.lr)
