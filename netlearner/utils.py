@@ -181,6 +181,15 @@ def get_batch(train_dataset, train_labels, step, batch_size):
     return batch_data, batch_labels
 
 
+def next_batch(dataset, step, batch_size):
+    offset = int(batch_size * step) % dataset.shape[0]
+    end = int(offset + batch_size) % dataset.shape[0]
+    if end < offset:
+        return np.concatenate((dataset[offset:, :], dataset[0:end, :]), axis=0)
+    else:
+        return dataset[offset:end, :]
+
+
 def create_dir(dirname):
     try:
         os.mkdir(dirname)

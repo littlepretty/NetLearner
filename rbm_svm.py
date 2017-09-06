@@ -23,7 +23,7 @@ def LinearSVM(train_dataset, train_labels, test_dataset, test_labels):
                                  'LinearSVM', 'RBM-Encoded TRAIN SET')
     test_prediction = clf.predict(test_dataset)
     compute_classification_table(test_prediction, test_labels,
-                                 'LinearSVM', 'RBM-Encoded TRAIN SET')
+                                 'LinearSVM', 'RBM-Encoded TEST SET')
 
 
 def NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels):
@@ -37,7 +37,7 @@ def NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels):
                                  'NonLinearSVM', 'RBM-Encoded TRAIN SET')
     test_prediction = clf.predict(test_dataset)
     compute_classification_table(test_prediction, test_labels,
-                                 'NonLinearSVM', 'RBM-Encoded TRAIN SET')
+                                 'NonLinearSVM', 'RBM-Encoded TEST SET')
 
 
 if __name__ == '__main__':
