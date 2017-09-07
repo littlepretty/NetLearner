@@ -2,7 +2,9 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 from utils import next_batch
-# from time import localtime, strftime
+from time import localtime, strftime
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 
 class GenerativeAdversarialNets(object):
@@ -22,9 +24,9 @@ class GenerativeAdversarialNets(object):
         self.Z = tf.placeholder(tf.float32, [None, noise_dim], name='noise')
         self.X = tf.placeholder(tf.float32, [None, input_dim], name='input')
 
-        G_sample = self.generator(self.Z)
+        self.G_sample = self.generator(self.Z)
         D_real_prob, D_real_logit = self.discriminator(self.X)
-        D_fake_prob, D_fake_logit = self.discriminator(G_sample)
+        D_fake_prob, D_fake_logit = self.discriminator(self.G_sample)
         # D_loss_real = -tf.log(D_real_prob)
         # D_loss_fake = -tf.log(1 - D_fake_prob)
         D_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(
@@ -45,6 +47,12 @@ class GenerativeAdversarialNets(object):
             self.D_loss, var_list=self.theta_D)
         self.G_solver = optimizer(learning_rate=self.learning_rate).minimize(
             self.G_loss, var_list=self.theta_G)
+
+        time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
+        self.dirname = name + '/Run-' + time_str
+        self.train_writer = tf.summary.FileWriter(self.dirname)
+        self._create_summaries()
+        self.merged_summary = tf.summary.merge_all()
 
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
@@ -74,6 +82,9 @@ class GenerativeAdversarialNets(object):
 
         return theta_G, theta_D
 
+    def _create_summaries(self):
+        pass
+
     def generator(self, z):
         G_W1, G_b1 = self.theta_G['G_W1'], self.theta_G['G_b1']
         G_W2, G_b2 = self.theta_G['G_W2'], self.theta_G['G_b2']
@@ -95,11 +106,26 @@ class GenerativeAdversarialNets(object):
     def sample_noise(self, size):
         return np.random.uniform(-1.0, 1.0, size=size)
 
+    def plot_samples(self, samples):
+        fig = plt.figure(figsize=(4, 4))
+        gs = gridspec.GridSpec(4, 4)
+        gs.update(wspace=0.05, hspace=0.05)
+
+        for i, sample in enumerate(samples):
+            ax = plt.subplot(gs[i])
+            plt.axis('off')
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            ax.set_aspect('equal')
+            plt.imshow(sample.reshape(28, 28), cmap='Greys_r')
+
+        return fig
+
     def train(self, batch_size, train_dataset, num_steps, init_lr):
         display_step = num_steps // 10
         perm = np.random.permutation(train_dataset.shape[0])
         X = train_dataset[perm, :]
-
+        fig_index = 0
         for step in xrange(num_steps):
             batch_X = next_batch(X, step, batch_size)
             batch_Z_D = self.sample_noise([batch_size, self.noise_dim])
@@ -117,6 +143,14 @@ class GenerativeAdversarialNets(object):
                 print('Batch(%d cases) loss at step %d' % (batch_X.shape[0],
                                                            step))
                 print('D loss: %.6f, G loss: %.6f' % (D_loss, G_loss))
+                display_Z = self.sample_noise([16, self.noise_dim])
+                samples = self.sess.run(self.G_sample,
+                                        feed_dict={self.Z: display_Z})
+                fig = self.plot_samples(samples)
+                plt.savefig('mnish_sample_%d.png' % fig_index,
+                            bbox_inches='tight')
+                fig_index += 1
+                plt.close(fig)
 
         print('Finish Training for %d steps' % num_steps)
         Z_D = self.sample_noise([X.shape[0], self.noise_dim])

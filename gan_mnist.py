@@ -1,9 +1,5 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import os
 from netlearner.gan import GenerativeAdversarialNets
 from math import ceil
 
@@ -17,8 +13,8 @@ noise_dim = 100
 G_hidden_layer = 128
 D_hidden_layer = 128
 
-batch_size = 80
-num_epochs = 4
+batch_size = 128
+num_epochs = 200
 init_lr = 0.001
 num_steps = ceil(num_samples / batch_size * num_epochs)
 
