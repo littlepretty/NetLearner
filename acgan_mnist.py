@@ -1,10 +1,10 @@
-import tensorflow as tf
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
 from netlearner.ac_gan import AuxiliaryClassifierGAN
 from math import ceil
 import subprocess
 
+np.random.seed(7453)
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 train_dataset = mnist.train.images
 train_labels = mnist.train.labels
@@ -14,14 +14,13 @@ _, label_dim = train_labels.shape
 perm = np.random.permutation(num_samples)
 train_dataset = train_dataset[perm, :]
 train_labels = train_labels[perm, :]
-print(train_labels[100: 110, :])
 
 noise_dim = 100
 batch_size = 128
-num_epochs = 120
+num_epochs = 160
 init_lr = 0.001
 num_steps = int(ceil(num_samples / batch_size) * num_epochs)
-decay_steps = 80 * int(ceil(num_samples / batch_size))
+decay_steps = num_steps / 10  # decay learning rate every 10 epochs
 G_hidden_layer = 256
 D_hidden_layer = 256
 gan = AuxiliaryClassifierGAN(noise_dim, input_dim, label_dim,

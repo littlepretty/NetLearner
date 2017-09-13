@@ -5,6 +5,8 @@ import errno
 import tensorflow as tf
 from tabulate import tabulate
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 
 def min_max_scale(X_train, X_valid, X_test):
@@ -24,13 +26,15 @@ def standard_scale(X_train, X_valid, X_test):
 
 
 def accuracy(predictions, labels):
-    return 100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1)) / predictions.shape[0]
+    return 100.0 * np.sum(np.argmax(predictions, 1) ==
+                          np.argmax(labels, 1)) / predictions.shape[0]
 
 
 def accuracy_binary(predictions, labels):
     predicted_class = np.argmax(predictions, 1)
     actual_class = np.argmax(labels, 1)
-    correct1 = np.logical_and(np.greater(predicted_class, 0), np.greater(actual_class, 0))
+    correct1 = np.logical_and(np.greater(predicted_class, 0),
+                              np.greater(actual_class, 0))
     correct2 = np.logical_and(predicted_class == 0, actual_class == 0)
     return 100.0 * (np.sum(correct1) + np.sum(correct2)) / predictions.shape[0]
 
@@ -91,11 +95,14 @@ def correct_percentage(matrix, dataset_name='Test'):
 
 
 def xavier_init(fan_in, fan_out, constant=1):
-    low = -constant * np.sqrt(6.0 / (fan_in + fan_out))
-    high = constant * np.sqrt(6.0 / (fan_in + fan_out))
-    return tf.random_uniform((fan_in, fan_out),
-                             minval=low, maxval=high,
-                             dtype=tf.float32)
+    xavier_std = 2.0 / (fan_in + fan_out)
+    return tf.truncated_normal((fan_in, fan_out), mean=0.0,
+                               stddev=xavier_std, dtype=tf.float64)
+    # low = -constant * np.sqrt(6.0 / (fan_in + fan_out))
+    # high = constant * np.sqrt(6.0 / (fan_in + fan_out))
+    # return tf.random_uniform((fan_in, fan_out),
+                             # minval=low, maxval=high,
+                             # dtype=tf.float32)
 
 
 def sample_prob_dist(prob, rand):
@@ -119,10 +126,12 @@ def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
         accu_binary = accuracy_binary(predictions, labels)
         log.write("%sset accuracy: %f%%\n" % (dataset_name, accu_binary))
         binary_headers = [str(i) for i in [0, 1]]
-        binary_class_table = compute_classification_table_binary(predictions, labels)
+        binary_class_table = compute_classification_table_binary(predictions,
+                                                                 labels)
         log.write(tabulate(binary_class_table, binary_headers) + '\n')
         if dataset_name == 'Test':
-            log.write(tabulate(binary_class_table, binary_headers, tablefmt='latex') + '\n')
+            log.write(tabulate(binary_class_table, binary_headers,
+                               tablefmt='latex') + '\n')
         log.write(correct_percentage(binary_class_table, dataset_name) + '\n')
         log.close()
 
@@ -200,8 +209,36 @@ def create_dir(dirname):
 
 def attach_candidate_labels(dataset, num_labels):
     candidates = np.zeros([num_labels, dataset.shape[0], num_labels])
-    result = np.zeros([num_labels, dataset.shape[0], dataset.shape[1] + num_labels])
+    result = np.zeros([num_labels, dataset.shape[0],
+                       dataset.shape[1] + num_labels])
     for i in range(num_labels):
         candidates[i, :, i] = np.ones((dataset.shape[0]))
         result[i] = np.concatenate((dataset, candidates[i]), axis=1)
     return result
+
+
+def plot_samples(samples, dirname, fig_index, size=8, image=28):
+    fig = plt.figure(figsize=(size, size))
+    gs = gridspec.GridSpec(size, size, wspace=0.05, hspace=0.05)
+
+    for i, sample in enumerate(samples):
+        ax = plt.subplot(gs[i])
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_aspect('equal')
+        plt.imshow(sample.reshape(image, image), cmap='Greys_r')
+
+    plt.savefig('%s/sample_%d.png' % (dirname, fig_index),
+                bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_V(dirname, D_V, G_V):
+    fig, ax = plt.subplots()
+    ax.plot(range(len(D_V)), D_V, 'rs-', label='V(D)')
+    ax.plot(range(len(G_V)), G_V, 'bd-', label='V(G)')
+    ax.legend(loc='upper right')
+    plt.grid()
+    plt.savefig('%s/compare_DG.png' % dirname, bbox_inches='tight')
+    plt.close(fig)
