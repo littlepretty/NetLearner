@@ -1,6 +1,6 @@
 import numpy as np
 from tensorflow.examples.tutorials.mnist import input_data
-from netlearner.ac_gan import AuxiliaryClassifierGAN
+from netlearner.ac_gan import AuxiliaryClassifierGAN, ACGANTwoLayers
 from math import ceil
 import subprocess
 
@@ -14,19 +14,41 @@ _, label_dim = train_labels.shape
 perm = np.random.permutation(num_samples)
 train_dataset = train_dataset[perm, :]
 train_labels = train_labels[perm, :]
-
 noise_dim = 100
 batch_size = 128
-num_epochs = 160
-init_lr = 0.001
-num_steps = int(ceil(num_samples / batch_size) * num_epochs)
-decay_steps = num_steps / 10  # decay learning rate every 10 epochs
-G_hidden_layer = 256
-D_hidden_layer = 256
-gan = AuxiliaryClassifierGAN(noise_dim, input_dim, label_dim,
-                             G_hidden_layer, D_hidden_layer,
-                             init_lr, decay_steps)
-gan.train(batch_size, train_dataset, train_labels, num_steps)
+keep_prob = 0.8
+
+
+def create_ac_gan():
+    print('Creating Single Layer AC-GAN')
+    G_hidden_layer = 160
+    D_hidden_layer = 160
+    init_lr = 0.001
+    num_epochs = 160
+    num_steps = int(ceil(num_samples / batch_size) * num_epochs)
+    decay_steps = num_steps / 10  # decay learning rate every 10 epochs
+    gan = AuxiliaryClassifierGAN(noise_dim, input_dim, label_dim,
+                                 G_hidden_layer, D_hidden_layer,
+                                 init_lr, decay_steps)
+    return gan, num_steps
+
+
+def create_two_layer_ac_gan():
+    print('Creating 2 Layer AC-GAN')
+    G_hidden_layer = [128, 256]
+    D_hidden_layer = [128, 64]
+    init_lr = 0.0008
+    num_epochs = 100
+    num_steps = int(ceil(num_samples / batch_size) * num_epochs)
+    decay_steps = num_steps / 8  # decay learning rate every 10 epochs
+    gan = ACGANTwoLayers(noise_dim, input_dim, label_dim,
+                         G_hidden_layer, D_hidden_layer,
+                         init_lr, decay_steps)
+    return gan, num_steps
+
+gan, num_steps = create_two_layer_ac_gan()
+gan.train(batch_size, train_dataset, train_labels,
+          num_steps, keep_prob)
 gan.close()
 subprocess.call("convert -delay 40 -dispose previous -loop 0 \
                 %s/sample_*.png %s/animated.gif" %
