@@ -35,16 +35,17 @@ def create_ac_gan():
 
 def create_two_layer_ac_gan():
     print('Creating 2 Layer AC-GAN')
-    G_hidden_layer = [160, 160]
-    D_hidden_layer = [80, 80]
+    G_hidden_layer = [200, 200]
+    D_hidden_layer = [160, 80]
     init_lr = 0.0008
-    num_epochs = 280
+    num_epochs = 320
     num_steps = int(ceil(num_samples / batch_size) * num_epochs)
     decay_steps = num_steps / 8  # decay learning rate every 10 epochs
     gan = ACGANTwoLayers(noise_dim, input_dim, label_dim,
                          G_hidden_layer, D_hidden_layer,
                          init_lr, decay_steps)
     return gan, num_steps
+
 
 gan, num_steps = create_two_layer_ac_gan()
 gan.train(batch_size, train_dataset, train_labels,
