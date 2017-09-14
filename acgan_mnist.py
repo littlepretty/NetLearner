@@ -10,13 +10,13 @@ train_dataset = mnist.train.images
 train_labels = mnist.train.labels
 num_samples, input_dim = train_dataset.shape
 _, label_dim = train_labels.shape
-
 perm = np.random.permutation(num_samples)
 train_dataset = train_dataset[perm, :]
 train_labels = train_labels[perm, :]
+
 noise_dim = 100
 batch_size = 128
-keep_prob = 0.8
+keep_prob = 1.0
 
 
 def create_ac_gan():
@@ -24,7 +24,7 @@ def create_ac_gan():
     G_hidden_layer = 160
     D_hidden_layer = 160
     init_lr = 0.001
-    num_epochs = 160
+    num_epochs = 240
     num_steps = int(ceil(num_samples / batch_size) * num_epochs)
     decay_steps = num_steps / 10  # decay learning rate every 10 epochs
     gan = AuxiliaryClassifierGAN(noise_dim, input_dim, label_dim,
@@ -35,10 +35,10 @@ def create_ac_gan():
 
 def create_two_layer_ac_gan():
     print('Creating 2 Layer AC-GAN')
-    G_hidden_layer = [128, 256]
-    D_hidden_layer = [128, 64]
+    G_hidden_layer = [160, 160]
+    D_hidden_layer = [80, 80]
     init_lr = 0.0008
-    num_epochs = 100
+    num_epochs = 280
     num_steps = int(ceil(num_samples / batch_size) * num_epochs)
     decay_steps = num_steps / 8  # decay learning rate every 10 epochs
     gan = ACGANTwoLayers(noise_dim, input_dim, label_dim,

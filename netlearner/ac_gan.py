@@ -129,11 +129,6 @@ class AuxiliaryClassifierGAN(object):
         tf.summary.scalar('C', -self.C_neg)
         tf.summary.scalar('DV', -self.D_V_neg)  # should increase
         tf.summary.scalar('GV', self.G_V)  # should decrease
-        # tf.summary.histogram('X_fake', self.G_sample)
-        # tf.summary.histogram('X_real', self.X)
-        # tf.summary.image('Geneated MNIST images',
-                         # tf.reshape(self.G_sample, [-1, 28, 28, 1]),
-                         # max_outputs=10)
 
     def make_summary(self, step, X, Z, Y, keep_prob):
         summaries = self.sess.run(self.merged_summary,
@@ -217,7 +212,7 @@ class ACGANTwoLayers(AuxiliaryClassifierGAN):
     def __init__(self, noise_dim, input_dim, label_dim,
                  G_hidden_layer, D_hidden_layer,
                  init_lr, decay_steps,
-                 optimizer=tf.train.AdamOptimizer, name='AC-GAN-2Layers'):
+                 optimizer=tf.train.AdamOptimizer, name='AC-2LayersGAN'):
         super(ACGANTwoLayers, self).__init__(noise_dim, input_dim, label_dim,
                                              G_hidden_layer, D_hidden_layer,
                                              init_lr, decay_steps,
