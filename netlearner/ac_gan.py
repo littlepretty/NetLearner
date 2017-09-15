@@ -140,7 +140,7 @@ class AuxiliaryClassifierGAN(object):
 
     def train(self, batch_size, train_dataset, train_labels,
               num_steps, keep_prob=0.8):
-        display_step = num_steps // 20
+        display_step = num_steps // 40
         summary_step = num_steps // 100
 
         perm = np.random.permutation(train_dataset.shape[0])

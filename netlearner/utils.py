@@ -7,6 +7,7 @@ from tabulate import tabulate
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import math
 
 
 def min_max_scale(X_train, X_valid, X_test):
@@ -217,7 +218,13 @@ def attach_candidate_labels(dataset, num_labels):
     return result
 
 
-def plot_samples(samples, dirname, fig_index, size=8, image=28):
+def plot_samples(samples, dirname, fig_index):
+    num_samples, feature_dim = samples.shape
+    size = int(math.sqrt(num_samples))
+    image = int(math.sqrt(feature_dim))
+    if (size * size != num_samples) or (image * image != feature_dim):
+        return
+
     fig = plt.figure(figsize=(size, size))
     gs = gridspec.GridSpec(size, size, wspace=0.05, hspace=0.05)
 
@@ -242,3 +249,11 @@ def plot_V(dirname, D_V, G_V):
     plt.grid()
     plt.savefig('%s/compare_DG.png' % dirname, bbox_inches='tight')
     plt.close(fig)
+
+
+def permutate_dataset(dataset, labels, name='Training'):
+    perm = np.random.permutation(dataset.shape[0])
+    perm_dataset = dataset[perm, :]
+    perm_labels = labels[perm, :]
+    print('%s set' % name, perm_dataset.shape, perm_labels.shape)
+    return perm_dataset, perm_labels
