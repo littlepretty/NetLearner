@@ -7,8 +7,9 @@ from time import localtime, strftime
 
 class MultilayerPerceptron(object):
     def __init__(self, feature_size, hidden_layer_sizes, num_labels,
-                 beta=0.009, trans_func=tf.nn.relu,
-                 reg_func=tf.nn.l2_loss, class_weights=None,
+                 init_lr=0.001, decay_steps=10000, beta=0.009,
+                 trans_func=tf.nn.relu, reg_func=tf.nn.l2_loss,
+                 class_weights=None,
                  optimizer=tf.train.GradientDescentOptimizer, name='mlp'):
         self.feature_size = feature_size
         self.layer_sizes = hidden_layer_sizes + [num_labels]
@@ -19,7 +20,9 @@ class MultilayerPerceptron(object):
         self.x = tf.placeholder(tf.float64, [None, feature_size], name='input')
         self.t = tf.placeholder(tf.float64, [None, num_labels], name='target')
         self.keep_prob = tf.placeholder(tf.float64, name='keep_prob')
-        self.learning_rate = tf.placeholder(tf.float64, name='lr')
+        global_step = tf.Variable(0, trainable=False)
+        self.lr = tf.train.exponential_decay(init_lr, global_step,
+                                             decay_steps, 0.96, staircase=True)
         self.train_accuracy_record = tf.placeholder(tf.float64,
                                                     name='train_accu')
         self.valid_loss_record = tf.placeholder(tf.float64, name='valid_loss')
@@ -35,7 +38,7 @@ class MultilayerPerceptron(object):
 
         self.loss = self.classify_loss + self.regterm
         self.optimizer = optimizer(
-            learning_rate=self.learning_rate).minimize(self.loss)
+            learning_rate=self.lr).minimize(self.loss, global_step=global_step)
 
         self.predict = tf.nn.softmax(self.final_logits)
 
@@ -131,7 +134,7 @@ class MultilayerPerceptron(object):
             # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
             # tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
 
-        tf.summary.scalar('learning rate', self.learning_rate)
+        tf.summary.scalar('learning rate', self.lr)
         tf.summary.scalar('keep prob', self.keep_prob)
         # tf.summary.scalar('regularization loss', self.regterm_record)
         tf.summary.scalar('train accuracy', self.train_accuracy_record)
@@ -139,12 +142,11 @@ class MultilayerPerceptron(object):
         tf.summary.scalar('valid accuracy', self.valid_accuracy_record)
         tf.summary.scalar('test accuracy', self.test_accuracy_record)
 
-    def fit(self, X, T, lr, prob=0.5):
+    def fit(self, X, T, prob=0.5):
         opt, loss, reg = self.sess.run(
             [self.optimizer, self.loss, self.regterm],
             feed_dict={self.x: X, self.t: T,
-                       self.keep_prob: prob,
-                       self.learning_rate: lr})
+                       self.keep_prob: prob})
         return loss, reg
 
     def make_prediction(self, X):
@@ -160,15 +162,14 @@ class MultilayerPerceptron(object):
         return loss
 
     def make_summary(self, train_accu, valid_loss, valid_accu,
-                     test_accu, lr, keep_prob, step):
+                     test_accu, keep_prob, step):
         summaries = self.sess.run(
             self.merged_summary,
             feed_dict={self.keep_prob: keep_prob,
                        self.train_accuracy_record: train_accu,
                        self.valid_loss_record: valid_loss,
                        self.valid_accuracy_record: valid_accu,
-                       self.test_accuracy_record: test_accu,
-                       self.learning_rate: lr})
+                       self.test_accuracy_record: test_accu, })
         self.train_writer.add_summary(summaries, step)
 
     def get_weights(self, name='w0'):
@@ -177,8 +178,8 @@ class MultilayerPerceptron(object):
     def exit(self):
         self.sess.close()
 
-    def train_with_labels(self, train_dataset, train_labels, batch_size,
-                          num_steps, init_lr,
+    def train_with_labels(self, train_dataset, train_labels,
+                          batch_size, num_steps,
                           valid_dataset, valid_labels,
                           test_dataset, test_labels, keep_prob=0.8):
         display_step = num_steps // 10
@@ -196,7 +197,7 @@ class MultilayerPerceptron(object):
         train_accu = 0.0
         valid_accu = 0.0
         valid_loss = 0.0
-        lr = init_lr
+
         batch_size /= self.num_labels
         for step in range(num_steps):
             if self.num_labels > 2:
@@ -222,24 +223,22 @@ class MultilayerPerceptron(object):
             perm = np.random.permutation(batch_data.shape[0])
             batch_data = batch_data[perm, :]
             batch_labels = batch_labels[perm, :]
-            lr = init_lr * np.power(0.32, float(step) / float(num_steps))
-            loss, reg = self.fit(batch_data, batch_labels, lr, keep_prob)
+            loss, reg = self.fit(batch_data, batch_labels, keep_prob)
 
             if step != 0 and step % summary_step == 0:
                 train_predict = self.make_prediction(train_dataset)
                 train_accu = accuracy(train_predict, train_labels)
                 valid_predict = self.make_prediction(valid_dataset)
-                valid_loss, valid_reg = self.sess.run(
-                    [self.loss, self.regterm],
+                valid_loss, valid_reg, lr = self.sess.run(
+                    [self.loss, self.regterm, self.lr],
                     feed_dict={self.x: valid_dataset,
                                self.t: valid_labels,
-                               self.keep_prob: keep_prob,
-                               self.learning_rate: lr})
+                               self.keep_prob: keep_prob, })
                 valid_accu = accuracy(valid_predict, valid_labels)
                 test_predict = self.make_prediction(test_dataset)
                 test_accu = accuracy(test_predict, test_labels)
                 self.make_summary(train_accu, valid_loss, valid_accu,
-                                  test_accu, lr, keep_prob, step)
+                                  test_accu, keep_prob, step)
 
             if step != 0 and step % display_step == 0:
                 batch_predict = self.make_prediction(batch_data)
@@ -272,4 +271,4 @@ class MultilayerPerceptron(object):
         measure_prediction(test_predict, test_labels, self.dirname, 'Test')
 
         self.make_summary(train_accu, valid_loss, valid_accu, test_accu,
-                          lr, keep_prob, num_steps)
+                          keep_prob, num_steps)
