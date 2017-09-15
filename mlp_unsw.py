@@ -7,11 +7,11 @@ from netlearner.multilayer_perceptron import MultilayerPerceptron
 from math import ceil
 
 raw_train_dataset = np.load('UNSW/train_dataset.npy')
-train_labels = np.load('UNSW/train_labels_bin.npy')
+train_labels = np.load('UNSW/train_labels.npy')
 raw_valid_dataset = np.load('UNSW/valid_dataset.npy')
-valid_labels = np.load('UNSW/valid_labels_bin.npy')
+valid_labels = np.load('UNSW/valid_labels.npy')
 raw_test_dataset = np.load('UNSW/test_dataset.npy')
-test_labels = np.load('UNSW/test_labels_bin.npy')
+test_labels = np.load('UNSW/test_labels.npy')
 
 [train_dataset, valid_dataset, test_dataset] = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
@@ -45,10 +45,10 @@ for hidden_layer_size in hidden_layer_sizes:
             num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
             mp_classifier = MultilayerPerceptron(feature_size,
                                                  hidden_layer_size,
-                                                 num_labels, beta=beta,
-                                                 trans_func=tf.nn.relu,
-                                                 optimizer=tf.train.AdamOptimizer,
-                                                 class_weights=weights,
+                                                 num_labels, beta,
+                                                 tf.nn.relu,
+                                                 tf.nn.l2_loss, weights,
+                                                 tf.train.AdamOptimizer,
                                                  name='PureMLP-UNSW2C')
             mp_classifier.train_with_labels(train_dataset, train_labels,
                                             batch_size, int(num_steps), init_lr,
