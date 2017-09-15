@@ -5,7 +5,7 @@ from utils import next_batch, plot_samples, plot_V, xavier_init
 from time import localtime, strftime
 
 
-def another_loss():
+def another_loss(D_real_logit, D_fake_logit):
     D_V_real_neg = tf.nn.sigmoid_cross_entropy_with_logits(
         logits=D_real_logit,
         labels=tf.ones_like(D_real_logit))
@@ -15,7 +15,10 @@ def another_loss():
     G_V = tf.nn.sigmoid_cross_entropy_with_logits(
         logits=D_fake_logit,
         labels=tf.ones_like(D_fake_logit))
-    self.G_V = tf.reduce_mean(G_V)
+
+    D_V_neg = tf.reduce_mean(D_V_real_neg) + tf.reduce_mean(D_V_fake_neg)
+    G_V = tf.reduce_mean(G_V)
+    return D_V_neg, G_V
 
 
 class GenerativeAdversarialNets(object):
@@ -104,8 +107,8 @@ class GenerativeAdversarialNets(object):
         # tf.summary.histogram('X_fake', self.G_sample)
         # tf.summary.histogram('X_real', self.X)
         # tf.summary.image('Geneated MNIST images',
-                         # tf.reshape(self.G_sample, [-1, 28, 28, 1]),
-                         # max_outputs=10)
+        # tf.reshape(self.G_sample, [-1, 28, 28, 1]),
+        # max_outputs=10)
 
     def make_summary(self, step, X, Z, keep_prob):
         summaries = self.sess.run(self.merged_summary,
@@ -113,6 +116,12 @@ class GenerativeAdversarialNets(object):
                                              self.Z: Z,
                                              self.keep_prob: keep_prob})
         self.train_writer.add_summary(summaries, step)
+
+    def synthesize(self, size):
+        z = self.sample_noise([size, self.noise_dim])
+        fake_data = self.sess.run(self.G_sample,
+                                  feed_dict={self.Z: z, self.keep_prob: 1.0})
+        return fake_data
 
     def generator(self, z):
         G_W1, G_b1 = self.theta_G['G_W1'], self.theta_G['G_b1']
@@ -137,13 +146,14 @@ class GenerativeAdversarialNets(object):
         return np.random.normal(loc=0.0, scale=1.0, size=size)
         # return np.random.uniform(-1.0, 1.0, size=size)
 
-    def train(self, batch_size, train_dataset, num_steps, keep_prob=1.0):
+    def train(self, batch_size, train_dataset, num_steps, keep_prob=1.0,
+              num_display=64):
         display_step = num_steps // 40
         summary_step = num_steps // 100
         perm = np.random.permutation(train_dataset.shape[0])
         X = train_dataset[perm, :]
         # Use fixed Z to generate samples
-        display_Z = self.sample_noise([64, self.noise_dim])
+        display_Z = self.sample_noise([num_display, self.noise_dim])
 
         fig_index = 0
         inner_step = 0
@@ -156,10 +166,11 @@ class GenerativeAdversarialNets(object):
                 batch_X = next_batch(X, inner_step, batch_size)
                 inner_step += 1
                 batch_Z_D = self.sample_noise([batch_size, self.noise_dim])
-                _, D_V_neg = self.sess.run([self.D_solver, self.D_V_neg],
-                                           feed_dict={self.X: batch_X,
-                                                      self.Z: batch_Z_D,
-                                                      self.keep_prob: keep_prob})
+                _, D_V_neg = self.sess.run(
+                    [self.D_solver, self.D_V_neg],
+                    feed_dict={self.X: batch_X,
+                               self.Z: batch_Z_D,
+                               self.keep_prob: keep_prob})
             #  finish k steps for training D
             batch_Z_G = self.sample_noise([batch_size, self.noise_dim])
             _, G_V = self.sess.run([self.G_solver, self.G_V],
