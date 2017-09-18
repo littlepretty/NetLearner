@@ -222,7 +222,7 @@ def attach_candidate_labels(dataset, num_labels):
     return result
 
 
-def plot_samples(samples, dirname, fig_index):
+def plot_samples(samples, dirname, fig_index, name='sample'):
     num_samples, feature_dim = samples.shape
     size = int(math.sqrt(num_samples))
     image = int(math.sqrt(feature_dim))
@@ -240,7 +240,7 @@ def plot_samples(samples, dirname, fig_index):
         ax.set_aspect('equal')
         plt.imshow(sample.reshape(image, image), cmap='Greys_r')
 
-    plt.savefig('%s/sample_%d.png' % (dirname, fig_index),
+    plt.savefig('%s/%s_%d.png' % (dirname, name, fig_index),
                 bbox_inches='tight', format='png')
     plt.close(fig)
 
@@ -261,3 +261,13 @@ def permutate_dataset(dataset, labels, name='Training'):
     perm_labels = labels[perm, :]
     print('%s set' % name, perm_dataset.shape, perm_labels.shape)
     return perm_dataset, perm_labels
+
+
+def plot_traffic_as_image(dataset, labels, signiture, name, num_samples):
+    index = np.where(np.all(labels == signiture, axis=1))[0]
+    matches = dataset[index, :]
+    print('Real %s set' % name, matches.shape)
+    sample_index = np.random.choice(matches.shape[0],
+                                    num_samples, replace=False)
+    samples = matches[sample_index, :]
+    plot_samples(samples, 'UNSW', num_samples, name=name)

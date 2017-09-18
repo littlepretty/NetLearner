@@ -2,7 +2,7 @@ from __future__ import print_function
 import csv
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
-from netlearner.utils import maybe_npsave
+from netlearner.utils import maybe_npsave, plot_samples
 
 
 def discovery_category_map(filenames):
