@@ -68,23 +68,28 @@ def correct_percentage(matrix, dataset_name='Test'):
     """
     epsilon = 1e-26
     num_classes = matrix.shape[0]
-    weights = np.array([np.sum(matrix[i, :]) / np.sum(matrix) for i in range(num_classes)])
+    weights = np.array([np.sum(matrix[i, :]) / np.sum(matrix) for i
+                        in range(num_classes)])
     weights = np.reshape(weights, [num_classes, 1])
 
-    recall = np.array([matrix[i][i] / (np.sum(matrix[i, :]) + epsilon) for i in range(num_classes)])
+    recall = np.array([matrix[i][i] / (np.sum(matrix[i, :]) + epsilon) for i
+                       in range(num_classes)])
     avg_recall = np.dot(recall, weights)
     recall = np.append(recall, avg_recall)
 
-    precision = np.array([matrix[i][i] / (np.sum(matrix[:, i]) + epsilon) for i in range(num_classes)])
+    precision = np.array([matrix[i][i] / (np.sum(matrix[:, i]) + epsilon)
+                          for i in range(num_classes)])
     avg_precision = np.dot(precision, weights)
     precision = np.append(precision, avg_precision)
 
-    fscore = np.array([2 * precision[i] * recall[i] / (precision[i] + recall[i] + epsilon)
+    fscore = np.array([2 * precision[i] * recall[i] / (precision[i] +
+                                                       recall[i] + epsilon)
                        for i in range(num_classes)])
     avg_fscore = np.dot(fscore, weights)
     fscore = np.append(fscore, avg_fscore)
 
-    headers = ['Class'] + [str(i) for i in range(matrix.shape[0])] + ['Wtd. Avg.']
+    headers = ['Class'] + [str(i) for i in range(matrix.shape[0])] + \
+        ['Wtd. Avg.']
     row1 = ['Precision'] + ['%.2f' % (p * 100.0) for p in precision]
     row2 = ['Recall'] + ['%.2f' % (r * 100.0) for r in recall]
     row3 = ['F1-Score'] + ['%.2f' % (f * 100.0) for f in fscore]
@@ -101,9 +106,8 @@ def xavier_init(fan_in, fan_out, constant=1):
                                stddev=xavier_std, dtype=tf.float64)
     # low = -constant * np.sqrt(6.0 / (fan_in + fan_out))
     # high = constant * np.sqrt(6.0 / (fan_in + fan_out))
-    # return tf.random_uniform((fan_in, fan_out),
-                             # minval=low, maxval=high,
-                             # dtype=tf.float32)
+    # return tf.random_uniform((fan_in, fan_out), minval=low, maxval=high,
+    # dtype=tf.float64)
 
 
 def sample_prob_dist(prob, rand):
@@ -237,7 +241,7 @@ def plot_samples(samples, dirname, fig_index):
         plt.imshow(sample.reshape(image, image), cmap='Greys_r')
 
     plt.savefig('%s/sample_%d.png' % (dirname, fig_index),
-                bbox_inches='tight')
+                bbox_inches='tight', format='png')
     plt.close(fig)
 
 
