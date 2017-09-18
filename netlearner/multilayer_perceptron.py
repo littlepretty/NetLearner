@@ -1,7 +1,8 @@
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-from utils import xavier_init, accuracy, measure_prediction, get_batch
+from utils import xavier_init, accuracy, measure_prediction
+from utils import permutate_dataset, get_batch
 from time import localtime, strftime
 
 
@@ -185,11 +186,8 @@ class MultilayerPerceptron(object):
         display_step = num_steps // 10
         summary_step = num_steps // 100
         print('Training for %d steps' % num_steps)
-
-        train_perm = np.random.permutation(train_dataset.shape[0])
-        train_dataset = train_dataset[train_perm, :]
-        train_labels = train_labels[train_perm, :]
-
+        train_dataset, train_labels = permutate_dataset(train_dataset,
+                                                        train_labels)
         y = np.argmax(train_labels, 1)
         X = np.array([train_dataset[y == i, :] for i in range(self.num_labels)])
         Y = np.array([train_labels[y == i, :] for i in range(self.num_labels)])
