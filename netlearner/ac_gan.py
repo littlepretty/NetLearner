@@ -118,6 +118,16 @@ class AuxiliaryClassifierGAN(object):
     def sample_noise(self, size):
         return np.random.normal(loc=0.0, scale=1.0, size=size)
 
+    def synthesize(self, num_samples):
+        z = self.sample_noise([num_samples, self.noise_dim])
+        labels = np.ones(self.label_dim)
+        y = np.tile(np.diag(labels), [num_samples // 2, 1])
+        np.random.shuffe(y)
+        samples = self.sess.run(self.G_sample,
+                                feed_dict={self.Z: z, self.Y: y,
+                                           self.keep_prob: 1.0})
+        return samples, y
+
     def _create_summaries(self):
         tf.summary.scalar('data dimension', self.input_dim)
         tf.summary.scalar('label dimension', self.label_dim)
@@ -149,7 +159,7 @@ class AuxiliaryClassifierGAN(object):
 
         # Use fixed Z to generate samples
         display_Z = self.sample_noise([100, self.noise_dim])
-        labels = np.ones(10)
+        labels = np.ones(self.label_dim)
         display_Y = np.tile(np.diag(labels), [10, 1])
 
         fig_index = 0

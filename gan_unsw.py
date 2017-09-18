@@ -1,7 +1,8 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from netlearner.utils import min_max_scale, permutate_dataset, plot_samples
+from netlearner.utils import min_max_scale, permutate_dataset
+from netlearner.utils import plot_samples
 from netlearner.gan import GenerativeAdversarialNets
 from netlearner.utils import hyperparameter_summary
 from netlearner.multilayer_perceptron import MultilayerPerceptron
@@ -103,12 +104,8 @@ attack_label = np.array([0.0, 1.0])  # attacking label = 1
 attack_index = np.where(np.all(train_labels == attack_label, axis=1))[0]
 attack_dataset = train_dataset[attack_index, :]
 attack_labels = train_labels[attack_index, :]
-print('Real attack set', attack_dataset.shape, attack_labels.shape)
-# Plot what attacks look alike
-sample_index = np.random.choice(attack_dataset.shape[0], 64, replace=False)
-attack_samples = attack_dataset[sample_index, :]
-plot_samples(attack_samples, 'UNSW', 0)
 
+plot_traffic_as_image(train_dataset, train_labels, attack_label, 'attack', 64)
 fake_dataset = generate_fake_data(attack_dataset, attack_labels)
 mixed_dataset = np.concatenate((train_dataset, fake_dataset), axis=0)
 mixed_labels = np.concatenate((train_labels, attack_labels), axis=0)
