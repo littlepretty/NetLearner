@@ -13,13 +13,13 @@ def generate_fake_data(dataset, labels):
     _, num_labels = labels.shape
     noise_dim = 100
     batch_size = 100
-    num_epochs = 180
+    num_epochs = 60
     keep_prob = 0.9
     init_lr = 0.001
     num_steps = ceil(num_samples / batch_size * num_epochs)
     decay_steps = int(num_steps / 10)
-    G_hidden_layer = 160
-    D_hidden_layer = 160
+    G_hidden_layer = 128
+    D_hidden_layer = 128
     with tf.name_scope('GAN'):
         gan = GenerativeAdversarialNets(noise_dim, input_dim,
                                         G_hidden_layer, D_hidden_layer,
@@ -37,10 +37,10 @@ def classify(train_dataset, train_labels, valid_dataset, valid_labels,
     num_samples, feature_size = train_dataset.shape
     num_labels = train_labels.shape[1]
     batch_size = 80
-    keep_prob = 0.80
-    beta = 0.00001
-    weights = [1.0, 10.0]
-    num_epochs = [80]
+    keep_prob = 0.90
+    beta = 0.0000
+    weights = [1.0, 100.0]
+    num_epochs = [100]
     init_lrs = [0.001]
     hidden_layer_sizes = [
         [400],
