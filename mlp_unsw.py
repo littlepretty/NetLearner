@@ -4,7 +4,6 @@ import tensorflow as tf
 from netlearner.utils import hyperparameter_summary
 from netlearner.utils import min_max_scale
 from netlearner.multilayer_perceptron import MultilayerPerceptron
-from math import ceil
 
 raw_train_dataset = np.load('UNSW/train_dataset.npy')
 train_labels = np.load('UNSW/train_labels.npy')
@@ -31,7 +30,7 @@ batch_size = 80
 keep_prob = 0.80
 beta = 0.0001
 weights = [1.0, 100.0]
-num_epochs = [10]
+num_epochs = [20]
 init_lrs = [0.001]
 hidden_layer_sizes = [
                       [400],
@@ -42,16 +41,18 @@ hidden_layer_sizes = [
 for hidden_layer_size in hidden_layer_sizes:
     for init_lr in init_lrs:
         for num_epoch in num_epochs:
-            num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
+            num_steps = int(train_dataset.shape[0] / batch_size * num_epoch)
+            decay_steps = num_steps / num_epoch
             mp_classifier = MultilayerPerceptron(feature_size,
                                                  hidden_layer_size,
-                                                 num_labels, beta,
+                                                 num_labels, init_lr,
+                                                 decay_steps, beta,
                                                  tf.nn.relu,
                                                  tf.nn.l2_loss, weights,
                                                  tf.train.AdamOptimizer,
                                                  name='PureMLP-UNSW2C')
             mp_classifier.train_with_labels(train_dataset, train_labels,
-                                            batch_size, int(num_steps), init_lr,
+                                            batch_size, num_steps,
                                             valid_dataset, valid_labels,
                                             test_dataset, test_labels,
                                             keep_prob)

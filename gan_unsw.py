@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from netlearner.utils import min_max_scale, permutate_dataset
+from netlearner.utils import min_max_scale, permutate_dataset, plot_samples
 from netlearner.gan import GenerativeAdversarialNets
 from netlearner.utils import hyperparameter_summary
 from netlearner.multilayer_perceptron import MultilayerPerceptron
@@ -12,8 +12,8 @@ def generate_fake_data(dataset, labels):
     num_samples, input_dim = dataset.shape
     _, num_labels = labels.shape
     noise_dim = 100
-    batch_size = 120
-    num_epochs = 10
+    batch_size = 100
+    num_epochs = 160
     keep_prob = 0.9
     init_lr = 0.001
     num_steps = ceil(num_samples / batch_size * num_epochs)
@@ -39,8 +39,8 @@ def classify(train_dataset, train_labels, valid_dataset, valid_labels,
     batch_size = 80
     keep_prob = 0.80
     beta = 0.00001
-    weights = [1.0, 100.0]
-    num_epochs = [20]
+    weights = [1.0, 1.0]
+    num_epochs = [80]
     init_lrs = [0.001]
     hidden_layer_sizes = [
         [400],
@@ -52,15 +52,17 @@ def classify(train_dataset, train_labels, valid_dataset, valid_labels,
         for init_lr in init_lrs:
             for num_epoch in num_epochs:
                 num_steps = int(train_dataset.shape[0] / batch_size * num_epoch)
+                decay_steps = num_steps / num_epoch
                 mp_classifier = MultilayerPerceptron(feature_size,
                                                      hidden_layer_size,
-                                                     num_labels, beta,
-                                                     tf.nn.relu,
+                                                     num_labels, init_lr,
+                                                     decay_steps,
+                                                     beta, tf.nn.relu,
                                                      tf.nn.l2_loss, weights,
                                                      tf.train.AdamOptimizer,
                                                      name='GAN-MLP-UNSW')
                 mp_classifier.train_with_labels(train_dataset, train_labels,
-                                                batch_size, num_steps, init_lr,
+                                                batch_size, num_steps,
                                                 valid_dataset, valid_labels,
                                                 test_dataset, test_labels,
                                                 keep_prob)
@@ -95,17 +97,23 @@ train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
 valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
 test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 
+# Generate fake attacking data using GAN
 attack_label = np.array([0.0, 1.0])  # attacking label = 1
 attack_index = np.where(np.all(train_labels == attack_label, axis=1))[0]
 attack_dataset = train_dataset[attack_index, :]
 attack_labels = train_labels[attack_index, :]
 print(attack_dataset.shape, attack_labels.shape)
-fake_dataset = generate_fake_data(attack_dataset, attack_labels)
+# Plot what attacks look alike
+sample_index = np.random.choice(attack_dataset.shape[0], 64, replace=False)
+attack_samples = attack_dataset[sample_index, :]
+plot_samples(attack_samples, 'UNSW', 0)
 
-mixed_dataset = np.concatenate((train_dataset, fake_dataset), axis=0)
-mixed_labels = np.concatenate((train_labels, attack_labels), axis=0)
-print(mixed_dataset.shape, mixed_labels.shape)
+# fake_dataset = generate_fake_data(attack_dataset, attack_labels)
 
-tf.reset_default_graph()
-classify(mixed_dataset, mixed_labels, valid_dataset, valid_labels,
-         test_dataset, test_labels)
+# mixed_dataset = np.concatenate((train_dataset, fake_dataset), axis=0)
+# mixed_labels = np.concatenate((train_labels, attack_labels), axis=0)
+# print(mixed_dataset.shape, mixed_labels.shape)
+
+# tf.reset_default_graph()
+# classify(mixed_dataset, mixed_labels, valid_dataset, valid_labels,
+         # test_dataset, test_labels)
