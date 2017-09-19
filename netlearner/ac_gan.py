@@ -35,7 +35,7 @@ class AuxiliaryClassifierGAN(object):
             self.cross_entropy(C_fake_logits, self.Y)
 
         self.D_V_neg = self.S_neg + self.C_neg
-        self.G_V = tf.reduce_mean(-tf.log(D_fake)) + self.C_neg
+        self.G_V = tf.reduce_mean(tf.log(1.0 - D_fake)) + self.C_neg
 
         self.D_solver = optimizer(learning_rate=self.lr).minimize(
             self.D_V_neg, var_list=self.theta_D, global_step=global_step)
@@ -121,8 +121,8 @@ class AuxiliaryClassifierGAN(object):
     def synthesize(self, num_samples):
         z = self.sample_noise([num_samples, self.noise_dim])
         labels = np.ones(self.label_dim)
-        y = np.tile(np.diag(labels), [num_samples // 2, 1])
-        np.random.shuffe(y)
+        y = np.tile(np.diag(labels), [num_samples // self.label_dim, 1])
+        np.random.shuffle(y)
         samples = self.sess.run(self.G_sample,
                                 feed_dict={self.Z: z, self.Y: y,
                                            self.keep_prob: 1.0})
@@ -149,7 +149,7 @@ class AuxiliaryClassifierGAN(object):
         self.train_writer.add_summary(summaries, step)
 
     def train(self, batch_size, train_dataset, train_labels,
-              num_steps, keep_prob=0.8):
+              num_steps, keep_prob=0.8, num_display=100):
         display_step = num_steps // 40
         summary_step = num_steps // 100
 
@@ -158,9 +158,10 @@ class AuxiliaryClassifierGAN(object):
         Y = train_labels[perm, :]
 
         # Use fixed Z to generate samples
-        display_Z = self.sample_noise([100, self.noise_dim])
+        display_Z = self.sample_noise([num_display, self.noise_dim])
         labels = np.ones(self.label_dim)
-        display_Y = np.tile(np.diag(labels), [10, 1])
+        display_Y = np.tile(np.diag(labels),
+                            [num_display // self.label_dim, 1])
 
         fig_index = 0
         print('Training GAN for %d steps' % num_steps)
@@ -191,7 +192,7 @@ class AuxiliaryClassifierGAN(object):
                                         feed_dict={self.Z: display_Z,
                                                    self.Y: display_Y,
                                                    self.keep_prob: 1.0})
-                plot_samples(samples, self.dirname, fig_index, size=10)
+                plot_samples(samples, self.dirname, fig_index)
                 fig_index += 1
 
             if step % summary_step == 0:

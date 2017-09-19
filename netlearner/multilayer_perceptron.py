@@ -242,9 +242,9 @@ class MultilayerPerceptron(object):
                 batch_predict = self.make_prediction(batch_data)
                 train_predict = self.make_prediction(train_dataset)
                 valid_predict = self.make_prediction(valid_dataset)
-                print("Minibatch(%d cases) loss at step %d: %.6f\
-                      (regterm=%.4f, lr=%.6f)" % (batch_labels.shape[0],
-                                                  step, loss, reg, lr))
+                print("Minibatch(%d cases) loss at step %d: %.6f" %
+                      (batch_labels.shape[0], step, loss))
+                print("(regterm=%.6f, lr=%.6f)" % (reg, lr))
                 print("Minibatch train accuracy: %f%%" %
                       accuracy(batch_predict, batch_labels))
                 print("Trainset accuracy: %f%%" %
@@ -253,7 +253,6 @@ class MultilayerPerceptron(object):
                       accuracy(valid_predict, valid_labels))
 
         print('Multilayer Perceptron trained')
-
         train_loss = self.calc_total_loss(train_dataset, train_labels)
         print("Trainset total loss: %f" % train_loss)
         train_predict = self.make_prediction(train_dataset)

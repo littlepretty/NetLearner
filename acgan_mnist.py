@@ -16,7 +16,7 @@ train_labels = train_labels[perm, :]
 
 noise_dim = 100
 batch_size = 128
-keep_prob = 1.0
+keep_prob = 0.9
 
 
 def create_ac_gan():
@@ -47,7 +47,7 @@ def create_two_layer_ac_gan():
     return gan, num_steps
 
 
-gan, num_steps = create_two_layer_ac_gan()
+gan, num_steps = create_ac_gan()
 gan.train(batch_size, train_dataset, train_labels,
           num_steps, keep_prob)
 gan.close()
