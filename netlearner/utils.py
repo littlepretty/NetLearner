@@ -264,11 +264,12 @@ def permutate_dataset(dataset, labels, name='Training'):
     return perm_dataset, perm_labels
 
 
-def plot_traffic_as_image(dataset, labels, signiture, name, num_samples):
+def plot_traffic_as_image(dataset, labels, signiture,
+                          name, num_samples, dirname='UNSW'):
     index = np.where(np.all(labels == signiture, axis=1))[0]
     matches = dataset[index, :]
     print('Real %s set' % name, matches.shape)
     sample_index = np.random.choice(matches.shape[0],
                                     num_samples, replace=False)
     samples = matches[sample_index, :]
-    plot_samples(samples, 'UNSW', num_samples, name=name)
+    plot_samples(samples, dirname, num_samples, name)
