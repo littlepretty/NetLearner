@@ -2,7 +2,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from netlearner.utils import min_max_scale, permutate_dataset
-from netlearner.utils import plot_samples
+from netlearner.utils import plot_traffic_as_image
 from netlearner.gan import GenerativeAdversarialNets
 from netlearner.utils import hyperparameter_summary
 from netlearner.multilayer_perceptron import MultilayerPerceptron
@@ -16,9 +16,9 @@ def generate_fake_data(dataset, labels):
     batch_size = 100
     num_epochs = 60
     keep_prob = 0.9
-    init_lr = 0.001
+    init_lr = 0.002
     num_steps = ceil(num_samples / batch_size * num_epochs)
-    decay_steps = int(num_steps / 10)
+    decay_steps = int(num_steps / 4)
     G_hidden_layer = 128
     D_hidden_layer = 128
     with tf.name_scope('GAN'):
@@ -41,7 +41,7 @@ def classify(train_dataset, train_labels, valid_dataset, valid_labels,
     keep_prob = 0.90
     beta = 0.0000
     weights = [1.0, 100.0]
-    num_epochs = [100]
+    num_epochs = [60]
     init_lrs = [0.001]
     hidden_layer_sizes = [
         [400],
@@ -100,12 +100,13 @@ valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
 test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 
 # Generate fake attacking data using GAN
-attack_label = np.array([0.0, 1.0])  # attacking label = 1
-attack_index = np.where(np.all(train_labels == attack_label, axis=1))[0]
+attack_signature = np.array([0.0, 1.0])
+attack_index = np.where(np.all(train_labels == attack_signature, axis=1))[0]
 attack_dataset = train_dataset[attack_index, :]
 attack_labels = train_labels[attack_index, :]
 
-plot_traffic_as_image(train_dataset, train_labels, attack_label, 'attack', 64)
+plot_traffic_as_image(train_dataset, train_labels, attack_signature,
+                      'attack', 64)
 fake_dataset = generate_fake_data(attack_dataset, attack_labels)
 mixed_dataset = np.concatenate((train_dataset, fake_dataset), axis=0)
 mixed_labels = np.concatenate((train_labels, attack_labels), axis=0)
