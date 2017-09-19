@@ -238,7 +238,8 @@ def plot_samples(samples, dirname, fig_index, name='sample'):
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_aspect('equal')
-        plt.imshow(sample.reshape(image, image), cmap='Greys_r')
+        plt.imshow(sample.reshape(image, image), cmap='Greys_r',
+                   interpolation='none')
 
     plt.savefig('%s/%s_%d.png' % (dirname, name, fig_index),
                 bbox_inches='tight', format='png')
