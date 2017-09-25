@@ -2,7 +2,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from netlearner.utils import hyperparameter_summary
-from netlearner.utils import min_max_scale
+from netlearner.utils import min_max_scale  # pylint: disable=unused-import
+from netlearner.utils import interquartile_scale, quantile_scale
 from netlearner.multilayer_perceptron import MultilayerPerceptron
 
 raw_train_dataset = np.load('UNSW/train_dataset.npy')
@@ -12,7 +13,7 @@ valid_labels = np.load('UNSW/valid_labels.npy')
 raw_test_dataset = np.load('UNSW/test_dataset.npy')
 test_labels = np.load('UNSW/test_labels.npy')
 
-[train_dataset, valid_dataset, test_dataset] = min_max_scale(
+[train_dataset, valid_dataset, test_dataset] = quantile_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
 perm = np.random.permutation(train_dataset.shape[0])
 train_dataset = train_dataset[perm, :]
@@ -30,7 +31,7 @@ batch_size = 80
 keep_prob = 0.80
 beta = 0.0001
 weights = [1.0, 100.0]
-num_epochs = [20]
+num_epochs = [40]
 init_lrs = [0.001]
 hidden_layer_sizes = [
                       [400],

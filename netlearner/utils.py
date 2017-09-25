@@ -5,13 +5,15 @@ import errno
 import tensorflow as tf
 from tabulate import tabulate
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import QuantileTransformer, RobustScaler
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import math
 
 
 def min_max_scale(X_train, X_valid, X_test):
-    preprocessor = MinMaxScaler(feature_range=(0, 1)).fit(X_train)
+    preprocessor = MinMaxScaler(feature_range=(0, 1))
+    preprocessor.fit(X_train)
     norm_train = preprocessor.transform(X_train)
     norm_valid = preprocessor.transform(X_valid)
     norm_test = preprocessor.transform(X_test)
@@ -19,7 +21,26 @@ def min_max_scale(X_train, X_valid, X_test):
 
 
 def standard_scale(X_train, X_valid, X_test):
-    preprocessor = StandardScaler().fit(X_train)
+    preprocessor = StandardScaler()
+    preprocessor.fit(X_train)
+    X_train = preprocessor.transform(X_train)
+    X_valid = preprocessor.transform(X_valid)
+    X_test = preprocessor.transform(X_test)
+    return X_train, X_valid, X_test
+
+
+def interquartile_scale(X_train, X_valid, X_test):
+    preprocessor = RobustScaler(quantile_range=(25.0, 75.0))
+    preprocessor.fit(X_train)
+    X_train = preprocessor.transform(X_train)
+    X_valid = preprocessor.transform(X_valid)
+    X_test = preprocessor.transform(X_test)
+    return X_train, X_valid, X_test
+
+
+def quantile_scale(X_train, X_valid, X_test):
+    preprocessor = QuantileTransformer()
+    preprocessor.fit(X_train)
     X_train = preprocessor.transform(X_train)
     X_valid = preprocessor.transform(X_valid)
     X_test = preprocessor.transform(X_test)

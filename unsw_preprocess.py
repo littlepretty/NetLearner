@@ -165,5 +165,5 @@ def generate_dataset(one_hot_encode=True):
 
 
 if __name__ == '__main__':
-    # generate_dataset(True)
-    generate_dataset(False)
+    generate_dataset(True)
+    # generate_dataset(False)

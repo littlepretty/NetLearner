@@ -126,8 +126,7 @@ class MultilayerPerceptron(object):
             # [num_neurons, input_dim, 1, 1])
             # tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
             tf.summary.scalar('layer %d size' % (layer + 1), size)
-            tf.summary.histogram('histogram of layer %d weights' % (layer + 1),
-                                 layer_weight)
+            # tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
             # tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
             # tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
             # mean = tf.reduce_mean(layer_weight)
