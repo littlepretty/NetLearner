@@ -2,7 +2,7 @@ from __future__ import print_function
 import csv
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
-from netlearner.utils import maybe_npsave, plot_samples
+from netlearner.utils import maybe_npsave
 
 
 def discovery_category_map(filenames):
@@ -28,7 +28,10 @@ def discovery_category_map(filenames):
             if row[-2] not in attack:
                 attack[row[-2]] = aint
                 aint += 1
-
+    print(proto)
+    print(service)
+    print(state)
+    print(attack)
     return {'proto': proto, 'service': service,
             'state': state, 'attack': attack}
 
@@ -56,7 +59,7 @@ def load_csv(filename, category_maps):
     part1 = np.array(numerical_features, dtype=float)
     print('Numberic feature size:', part1.shape)
 
-    part2 = np.array(symbolic_features, dtype=float)
+    part2 = np.array(symbolic_features, dtype=int)
     print('Symbolic feature size:', part2.shape)
 
     bincount = np.bincount(labels)
@@ -66,6 +69,10 @@ def load_csv(filename, category_maps):
     labels = labels.T
     print('Label size:', labels.shape)
 
+    feature_max = np.amax(part2, axis=0)
+    feature_min = np.amin(part2, axis=0)
+    print('Max of integerized symbolic features', feature_max)
+    print('Min of integerized symbolic features', feature_min)
     return part1, part2, labels
 
 
@@ -115,17 +122,17 @@ def split_valid(dataset, labels, percent=0.12):
     # dist = get_indices_dist(labels)
 
     # for (i, indices) in enumerate(dist):
-        # valid_indices = indices[0: num_traffics]
-        # valid_dataset = np.concatenate((valid_dataset, dataset[valid_indices, :]),
-                                        # axis=0)
-        # valid_labels = np.concatenate((valid_labels, labels[valid_indices, :]),
-                                      # axis=0)
+    # valid_indices = indices[0: num_traffics]
+    # valid_dataset = np.concatenate((valid_dataset,
+    # dataset[valid_indices, :]), axis=0)
+    # valid_labels = np.concatenate((valid_labels,
+    # labels[valid_indices, :]), axis=0)
 
     print('Valid dataset', valid_dataset.shape, valid_labels.shape)
     return valid_dataset, valid_labels
 
 
-if __name__ == '__main__':
+def generate_dataset(one_hot_encode=True):
     prefix = 'UNSW/UNSW_NB15_'
     train_name = prefix + 'training-set.csv'
     test_name = prefix + 'testing-set.csv'
@@ -134,7 +141,9 @@ if __name__ == '__main__':
     num_train, sym_train, train_labels = load_csv(train_name, category_maps)
     num_test, sym_test, test_labels = load_csv(test_name, category_maps)
 
-    sym_train, sym_test = encode_symbolic_feature(sym_train, sym_test)
+    if one_hot_encode is True:
+        sym_train, sym_test = encode_symbolic_feature(sym_train, sym_test)
+
     train_labels = encode_labels(train_labels)
     test_labels = encode_labels(test_labels)
 
@@ -153,3 +162,8 @@ if __name__ == '__main__':
     print('Testset shape:', test_traffic.shape, test_labels.shape)
     maybe_npsave('UNSW/test_dataset', test_traffic)
     maybe_npsave('UNSW/test_labels', test_labels, binary_label=True)
+
+
+if __name__ == '__main__':
+    # generate_dataset(True)
+    generate_dataset(False)
