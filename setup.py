@@ -8,7 +8,7 @@ setup(name='netlearner',
       author='Jiaqi Yan',
       author_email='littlepretty881203@gmail.com',
       license='MIT',
-      packages=['netlearner', 'visualization'],
+      packages=['netlearner', 'visualize', 'preprocess'],
       install_requires=[
           'enum',
           'tabulate',

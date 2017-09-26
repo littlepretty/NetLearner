@@ -1,11 +1,12 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
+from preprocess.unsw import generate_dataset
 from netlearner.utils import hyperparameter_summary
-from netlearner.utils import min_max_scale  # pylint: disable=unused-import
-from netlearner.utils import interquartile_scale, quantile_scale
+from netlearner.utils import augment_quantiled, permutate_dataset
 from netlearner.multilayer_perceptron import MultilayerPerceptron
 
+generate_dataset(True)
 raw_train_dataset = np.load('UNSW/train_dataset.npy')
 train_labels = np.load('UNSW/train_labels.npy')
 raw_valid_dataset = np.load('UNSW/valid_dataset.npy')
@@ -13,14 +14,11 @@ valid_labels = np.load('UNSW/valid_labels.npy')
 raw_test_dataset = np.load('UNSW/test_dataset.npy')
 test_labels = np.load('UNSW/test_labels.npy')
 
-[train_dataset, valid_dataset, test_dataset] = quantile_scale(
-    raw_train_dataset, raw_valid_dataset, raw_test_dataset)
-perm = np.random.permutation(train_dataset.shape[0])
-train_dataset = train_dataset[perm, :]
-train_labels = train_labels[perm, :]
-perm = np.random.permutation(test_dataset.shape[0])
-test_dataset = test_dataset[perm, :]
-test_labels = test_labels[perm, :]
+columns = np.array(range(1, 6) + range(8, 16) + range(17, 19) +
+                   range(23, 25) + [26])
+[train_dataset, valid_dataset, test_dataset] = augment_quantiled(
+    raw_train_dataset, raw_valid_dataset, raw_test_dataset, columns)
+permutate_dataset(train_dataset, train_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Validation set', valid_dataset.shape, valid_labels.shape)
 print('Test set', test_dataset.shape, test_labels.shape)
@@ -31,10 +29,10 @@ batch_size = 80
 keep_prob = 0.80
 beta = 0.0001
 weights = [1.0, 100.0]
-num_epochs = [40]
+num_epochs = [32]
 init_lrs = [0.001]
 hidden_layer_sizes = [
-                      [400],
+                      [800],
                       # [800, 640], [160, 80], [80, 40],
                       # [400, 360, 320],
                       # [160, 120, 80], [120, 80, 40],

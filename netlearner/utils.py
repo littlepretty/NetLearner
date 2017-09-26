@@ -6,44 +6,73 @@ import tensorflow as tf
 from tabulate import tabulate
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.preprocessing import QuantileTransformer, RobustScaler
+from sklearn.preprocessing import FunctionTransformer
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import math
 
 
 def min_max_scale(X_train, X_valid, X_test):
-    preprocessor = MinMaxScaler(feature_range=(0, 1))
-    preprocessor.fit(X_train)
-    norm_train = preprocessor.transform(X_train)
-    norm_valid = preprocessor.transform(X_valid)
-    norm_test = preprocessor.transform(X_test)
+    scaler = MinMaxScaler(feature_range=(0.0, 1.0))
+    scaler.fit(X_train)
+    norm_train = scaler.transform(X_train)
+    norm_valid = scaler.transform(X_valid)
+    norm_test = scaler.transform(X_test)
     return norm_train, norm_valid, norm_test
 
 
 def standard_scale(X_train, X_valid, X_test):
-    preprocessor = StandardScaler()
-    preprocessor.fit(X_train)
-    X_train = preprocessor.transform(X_train)
-    X_valid = preprocessor.transform(X_valid)
-    X_test = preprocessor.transform(X_test)
+    scaler = StandardScaler()
+    scaler.fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_valid = scaler.transform(X_valid)
+    X_test = scaler.transform(X_test)
     return X_train, X_valid, X_test
 
 
 def interquartile_scale(X_train, X_valid, X_test):
-    preprocessor = RobustScaler(quantile_range=(25.0, 75.0))
-    preprocessor.fit(X_train)
-    X_train = preprocessor.transform(X_train)
-    X_valid = preprocessor.transform(X_valid)
-    X_test = preprocessor.transform(X_test)
+    scaler = RobustScaler(quantile_range=(25.0, 75.0))
+    scaler.fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_valid = scaler.transform(X_valid)
+    X_test = scaler.transform(X_test)
     return X_train, X_valid, X_test
 
 
-def quantile_scale(X_train, X_valid, X_test):
-    preprocessor = QuantileTransformer()
-    preprocessor.fit(X_train)
-    X_train = preprocessor.transform(X_train)
-    X_valid = preprocessor.transform(X_valid)
-    X_test = preprocessor.transform(X_test)
+def quantile_transform(X_train, X_valid, X_test, columns):
+    transformer = QuantileTransformer()
+    transformer.fit(X_train[:, columns])
+    part_X_train = transformer.transform(X_train[:, columns])
+    part_X_valid = transformer.transform(X_valid[:, columns])
+    part_X_test = transformer.transform(X_test[:, columns])
+    X_train[:, columns] = part_X_train
+    X_valid[:, columns] = part_X_valid
+    X_test[:, columns] = part_X_test
+    return X_train, X_valid, X_test
+
+
+def augment_quantiled(X_train, X_valid, X_test, columns):
+    transformer = QuantileTransformer()
+    transformer.fit(X_train[:, columns])
+    qX_train = transformer.transform(X_train[:, columns])
+    qX_valid = transformer.transform(X_valid[:, columns])
+    qX_test = transformer.transform(X_test[:, columns])
+    mX_train, mX_valid, mX_test = min_max_scale(X_train, X_valid, X_test)
+    X_train = np.concatenate((mX_train, qX_train), axis=1)
+    X_valid = np.concatenate((mX_valid, qX_valid), axis=1)
+    X_test = np.concatenate((mX_test, qX_test), axis=1)
+    return X_train, X_valid, X_test
+
+
+def log_transform(X_train, X_valid, X_test, columns):
+    transformer = FunctionTransformer(np.log1p)
+    part_X_train = transformer.transform(X_train[:, columns])
+    part_X_train = transformer.transform(X_train[:, columns])
+    part_X_valid = transformer.transform(X_valid[:, columns])
+    part_X_test = transformer.transform(X_test[:, columns])
+    X_train[:, columns] = part_X_train
+    X_valid[:, columns] = part_X_valid
+    X_test[:, columns] = part_X_test
     return X_train, X_valid, X_test
 
 
