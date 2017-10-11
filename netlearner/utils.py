@@ -16,8 +16,8 @@ def min_max_scale(X_train, X_valid, X_test):
     scaler = MinMaxScaler(feature_range=(0.0, 1.0))
     scaler.fit(X_train)
     norm_train = scaler.transform(X_train)
-    norm_valid = scaler.transform(X_valid)
-    norm_test = scaler.transform(X_test)
+    norm_valid = scaler.transform(X_valid) if X_valid is not None else None
+    norm_test = scaler.transform(X_test) if X_test is not None else None
     return norm_train, norm_valid, norm_test
 
 
@@ -25,8 +25,8 @@ def standard_scale(X_train, X_valid, X_test):
     scaler = StandardScaler()
     scaler.fit(X_train)
     X_train = scaler.transform(X_train)
-    X_valid = scaler.transform(X_valid)
-    X_test = scaler.transform(X_test)
+    X_valid = scaler.transform(X_valid) if X_valid is not None else None
+    X_test = scaler.transform(X_test) if X_test is not None else None
     return X_train, X_valid, X_test
 
 
@@ -34,42 +34,48 @@ def interquartile_scale(X_train, X_valid, X_test):
     scaler = RobustScaler(quantile_range=(25.0, 75.0))
     scaler.fit(X_train)
     X_train = scaler.transform(X_train)
-    X_valid = scaler.transform(X_valid)
-    X_test = scaler.transform(X_test)
+    X_valid = scaler.transform(X_valid) if X_valid is not None else None
+    X_test = scaler.transform(X_test) if X_test is not None else None
     return X_train, X_valid, X_test
 
 
 def quantile_transform(X_train, X_valid, X_test, columns):
-    transformer = QuantileTransformer()
-    transformer.fit(X_train[:, columns])
-    part_X_train = transformer.transform(X_train[:, columns])
-    part_X_valid = transformer.transform(X_valid[:, columns])
-    part_X_test = transformer.transform(X_test[:, columns])
-    X_train[:, columns] = part_X_train
-    X_valid[:, columns] = part_X_valid
-    X_test[:, columns] = part_X_test
-    return X_train, X_valid, X_test
+    t = QuantileTransformer()
+    t.fit(X_train[:, columns])
+    qX_train = t.transform(X_train[:, columns])
+    qX_valid = t.transform(X_valid[:, columns]) if X_valid is not None else None
+    qX_test = t.transform(X_test[:, columns]) if X_test is not None else None
+    if X_valid is not None:
+        X_train[:, columns] = qX_train
+        X_valid[:, columns] = qX_valid
+        X_test[:, columns] = qX_test
+        return X_train, X_valid, X_test
+    else:
+        return X_train
 
 
 def augment_quantiled(X_train, X_valid, X_test, columns):
-    transformer = QuantileTransformer()
-    transformer.fit(X_train[:, columns])
-    qX_train = transformer.transform(X_train[:, columns])
-    qX_valid = transformer.transform(X_valid[:, columns])
-    qX_test = transformer.transform(X_test[:, columns])
+    t = QuantileTransformer()
+    t.fit(X_train[:, columns])
+    qX_train = t.transform(X_train[:, columns])
+    qX_valid = t.transform(X_valid[:, columns]) if X_valid is not None else None
+    qX_test = t.transform(X_test[:, columns]) if X_test is not None else None
     mX_train, mX_valid, mX_test = min_max_scale(X_train, X_valid, X_test)
     X_train = np.concatenate((mX_train, qX_train), axis=1)
-    X_valid = np.concatenate((mX_valid, qX_valid), axis=1)
-    X_test = np.concatenate((mX_test, qX_test), axis=1)
-    return X_train, X_valid, X_test
+    if qX_valid is None:
+        return X_train
+    else:
+        X_valid = np.concatenate((mX_valid, qX_valid), axis=1)
+        X_test = np.concatenate((mX_test, qX_test), axis=1)
+        return X_train, X_valid, X_test
 
 
 def log_transform(X_train, X_valid, X_test, columns):
-    transformer = FunctionTransformer(np.log1p)
-    part_X_train = transformer.transform(X_train[:, columns])
-    part_X_train = transformer.transform(X_train[:, columns])
-    part_X_valid = transformer.transform(X_valid[:, columns])
-    part_X_test = transformer.transform(X_test[:, columns])
+    t = FunctionTransformer(np.log1p)
+    part_X_train = t.transform(X_train[:, columns])
+    part_X_train = t.transform(X_train[:, columns])
+    part_X_valid = t.transform(X_valid[:, columns])
+    part_X_test = t.transform(X_test[:, columns])
     X_train[:, columns] = part_X_train
     X_valid[:, columns] = part_X_valid
     X_test[:, columns] = part_X_test

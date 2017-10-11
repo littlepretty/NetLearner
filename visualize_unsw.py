@@ -16,7 +16,7 @@ test_labels = np.load('UNSW/test_labels.npy')
 
 # plot_single_feature_histogram(train_dataset, 'sjit')
 
-# Plot for original dataset
+print('Plot original dataset')
 path = 'UNSW/Histogram/Original'
 create_dir(path)
 plot_feature_histogram(raw_train_dataset, path)
@@ -26,7 +26,7 @@ plot_feature_with_labels(raw_train_dataset, train_labels, path)
 
 columns = np.array(range(1, 6) + range(8, 16) + range(17, 19) +
                    range(23, 25) + [26])
-# Plot for quantile transformed dataset
+print('Plot quantile transformed dataset')
 [train_dataset, valid_dataset, test_dataset] = quantile_transform(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset, columns)
 path = 'UNSW/Histogram/QuantileTransformed'
@@ -36,7 +36,7 @@ path = 'UNSW/FeatureComp/QuantileTransformed'
 create_dir(path)
 plot_feature_with_labels(train_dataset, train_labels, path)
 
-# Plot for log1p transformed dataset
+print('Plot for log1p transformed dataset')
 [train_dataset, valid_dataset, test_dataset] = log_transform(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset, columns)
 path = 'UNSW/Histogram/LogTransformed'
