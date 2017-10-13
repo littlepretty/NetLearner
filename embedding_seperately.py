@@ -1,5 +1,5 @@
 from keras.models import Sequential
-from keras.layers.core import Dense, Activation, Flatten, Dropout
+from keras.layers.core import Dense, Flatten, Dropout
 from keras.layers.embeddings import Embedding
 # from keras import optimizers
 from preprocess.unsw import generate_dataset
@@ -69,8 +69,8 @@ print("Augmenting discrete & embedding dataset", X_train.shape)
 print("Min-max scaled dataset", X_train.shape, X_test.shape)
 
 X_train, y_train = permutate_dataset(X_train, y_train)
-X_valid, y_valid = permutate_dataset(X_valid, y_valid)
-X_test, y_test = permutate_dataset(X_test, y_test)
+X_valid, y_valid = permutate_dataset(X_valid, y_valid, 'Valid')
+X_test, y_test = permutate_dataset(X_test, y_test, 'Test')
 
 num_features = X_train.shape[1]
 num_classes = y_train.shape[1]
@@ -89,7 +89,7 @@ model2.compile(loss='categorical_crossentropy',
                metrics=['accuracy'])
 history = model2.fit(X_train, y_train,
                      batch_size=64,
-                     epochs=60,
+                     epochs=160,
                      verbose=1,
                      class_weight={0: 1, 1: 1},
                      shuffle=True,
