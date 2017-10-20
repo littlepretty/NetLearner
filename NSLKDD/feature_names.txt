@@ -1,0 +1,44 @@
+index feature_name type(cont/sym) range(if symbolic)
+0 duration continuous
+1 protocol symbolic 3
+4 service symbolic 70
+74 flag symbolic 11
+85 src_bytes continuous
+86 dst_bytes continuous
+87 land symbolic 2
+89 wrong_fragment continuous
+90 urgent continuous
+91 hot continuous
+92 num_failed_logins continuous
+93 login symbolic 2
+95 num_compromised continuous
+96 root_shell continuous
+97 su_attempted continuous
+98 num_root continuous
+99 num_file_creations continuous
+100 num_shells continuous
+101 num_access_files continuous
+126 num_outbound_cmds continuous (this feature is always zero, ignored in preprocessing) 19
+102 host_login symbolic 2
+104 guest_login symbolic 2
+106 count continuous
+107 srv_count continuous
+108 serror_rate continuous
+109 srv_serror_rate continuous
+110 rerror_rate continuous
+111 srv_rerror_rate continuous
+112 same_srv_rate continuous
+113 diff_srv_rate continuous
+114 srv_diff_host_rate continuous
+115 dst_host_count continuous
+116 dst_host_srv_count continuous
+117 dst_host_same_srv_rate continuous
+118 dst_host_diff_srv_rate continuous
+119 dst_host_same_src_port_rate continuous
+120 dst_host_srv_diff_host_rate continuous
+121 dst_host_serror_rate continuous
+122 dst_host_srv_serror_rate continuous
+123 dst_host_rerror_rate continuous
+124 dst_host_srv_rerror_rate continuous
+125 traffic label
+127 difficulty not_used
