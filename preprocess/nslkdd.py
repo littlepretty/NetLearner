@@ -148,7 +148,11 @@ def load_traffic(filename, traffic_map=category_map, show=6):
     with open(filename, 'rb') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
         seen = set()
+        header = True
         for row in reader:
+            if header:
+                header = False  # Skip feature names/header
+                continue
             try:
                 # Ignore difficulty level
                 row = row[:-1]
@@ -314,6 +318,43 @@ def generate_datasets():
 
     dataset, labels = split_dataset_with_label(data_matrix)
     generate_valid_test_dataset(dataset, labels, dist)
+
+
+def get_feature_names():
+    f = open('NSLKDD/feature_names.txt', 'r')
+    f.readline()  # skip column head
+    feature_names = []
+    symbolic = []
+    continuous = []
+    for line in f.readlines():
+        contents = line.strip('\n').split(' ')
+        feature_names.append(contents[1])
+        if contents[2] == 'symbolic':
+            symbolic.append(contents[1])
+        elif contents[2] == 'continuous':
+            continuous.append(contents[1])
+
+    return feature_names, symbolic, continuous
+
+
+def get_categorical_values(name):
+    feature = None
+    if name == 'protocol':
+        feature = protocol_types
+    elif name == 'service':
+        feature = service_types
+    elif name == 'flag':
+        feature = flag_types
+    elif name == 'land':
+        feature = land_types
+    elif name == 'login':
+        feature = login_types
+    elif name == 'host_login':
+        feature = host_login_types
+    elif name == 'guest_login':
+        feature = guest_login_types
+
+    return feature.keys() if feature is not None else None
 
 
 if __name__ == '__main__':
