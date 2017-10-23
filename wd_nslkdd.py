@@ -92,10 +92,12 @@ def build_model(model_dir, model_type):
 def input_builder(data_file, num_epochs, shuffle):
     df_data = pd.read_csv(tf.gfile.Open(data_file),
                           names=CSV_COLUMNS,
+                          sep=',',
                           skipinitialspace=True,
                           engine='python',
                           skiprows=1)
     data = df_data.drop('difficulty', axis=1)
+    data = data.drop('traffic', axis=1)
 
     data['land'] = data['land'].astype(str)
     data['login'] = data['login'].astype(str)
@@ -128,6 +130,6 @@ def train_and_eval(model_dir, model_type, train_steps,
 train_filename = 'NSLKDD/KDDTrain+.txt'
 test_filename = 'NSLKDD/KDDTest+.txt'
 model_dir = 'WideDeepModel'
-train_steps = 80000
+train_steps = 8000
 train_and_eval(model_dir, 'wide+deep', train_steps,
                train_filename, test_filename)
