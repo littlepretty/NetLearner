@@ -8,7 +8,6 @@ from preprocess.full_unsw import get_feature_names, symbolic_features
 from preprocess.full_unsw import generate_header, discovery_discrete_range
 
 
-filenames = ['UNSW/UNSW-NB15_%d.csv' % x for x in range(1, 5)]
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
     get_feature_names('UNSW/feature_names.csv')
 print(symbolic_names, len(symbolic_names))
@@ -28,15 +27,20 @@ for name in continuous_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns[name] = column
 
+for name in discrete_names:
+    column = tf.feature_column.numeric_column(name)
+    continuous_columns[name] = column
+
 # convert discrete features into categorical columns
 discrete_columns = dict()
-
+"""
 upper, lower = discovery_discrete_range(filenames,
                                         discrete_names, CSV_COLUMNS)
 for name in discrete_names:
     column = tf.feature_column.categorical_column_with_identity(
         name, upper[name] - lower[name] + 1)
     discrete_columns[name] = column
+"""
 
 # Build components for the wide model
 base_columns = symbolic_columns.values() + discrete_columns.values()
@@ -46,22 +50,25 @@ print('#wide components:', len(wide_columns))
 
 # Build components for the deep model
 indicator_columns = []  # low dimension categorical features
-for name in ['state', 'service']:
+for name in symbolic_names:  # ['state', 'service']
     column = symbolic_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
 
+"""
 low_discrete_names = ['trans_depth', 'ct_state_ttl',
                       'ct_flw_http_mthd', 'ct_ftp_cmd']
 for name in low_discrete_names:
     column = discrete_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
+"""
 
 # convert high dimension categorical features to embeddings
 embedding_columns = []
+"""
 for (name, column) in symbolic_columns.items():
     volcabulary_size = len(symbolic_features[name])
     # print(name, '|V| =', volcabulary_size)
-    dim = 10
+    dim = 4
     embedding = tf.feature_column.embedding_column(column, dim)
     embedding_columns.append(embedding)
 
@@ -69,11 +76,11 @@ high_discrete_names = set(discrete_names).difference(set(low_discrete_names))
 for name in high_discrete_names:
     volcabulary_size = upper[name] - lower[name] + 1
     # print(name, '|V| =', volcabulary_size)
-    dim = 10
+    dim = 4
     column = discrete_columns[name]
     embedding = tf.feature_column.embedding_column(column, dim)
     embedding_columns.append(embedding)
-
+"""
 deep_columns = indicator_columns + embedding_columns \
     + continuous_columns.values()
 print('#deep components:', len(deep_columns))
@@ -114,13 +121,13 @@ def input_builder(filenames, num_epochs, shuffle):
 
     for filename in filenames:
         print('dealing with %s' % filename)
-        df = pd.read_csv(tf.gfile.Open(filename),
+        df = pd.read_csv(filename,
                          names=CSV_COLUMNS,
                          sep=',',
                          skipinitialspace=True,
                          engine='python',
                          na_values='-',
-                         nrows=10000)
+                         nrows=100000)
         # fill_nan(df)
         df.dropna(axis=0, how='any', inplace=True)
         label = df['label'].astype(int)
@@ -129,7 +136,7 @@ def input_builder(filenames, num_epochs, shuffle):
         for name in discrete_names:
             data[name] = pd.to_numeric(data[name], errors='raise',
                                        downcast='signed')
-            print(name, data[name].dtype)
+            # print(name, data[name].dtype)
 
         data_frames.append(data)
         label_frames.append(label)
@@ -151,14 +158,16 @@ def train_and_eval(model_dir, model_type, train_steps,
         steps=train_steps)
 
     results = m.evaluate(
-        input_fn=input_builder(test_filename, num_epochs=1, shuffle=False),
+        input_fn=input_builder([test_filename], num_epochs=1, shuffle=False),
         steps=None)
     for key in results:
         print("%s: %s" % (key, results[key]))
 
 
+filenames = ['UNSW/UNSW-NB15_%d.csv' % x for x in range(1, 3)]
 train_filenames = filenames[:-1]
 test_filename = filenames[-1]
+print(test_filename)
 train_steps = 1
 model_dir = None  # 'WideDeepModel'
 train_and_eval(model_dir, 'wide+deep', train_steps,
