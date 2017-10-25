@@ -1,0 +1,50 @@
+no.,name,type ,description
+1,srcip,nominal,source ip address
+2,sport,integer,source port number
+3,dstip,nominal,destination ip address
+4,dsport,integer,destination port number
+5,proto,nominal,transaction protocol
+6,state,nominal,"indicates to the state and its dependent protocol, e.g. acc, clo, con, eco, ecr, fin, int, mas, par, req, rst, tst, txd, urh, urn, and (-) (if not used state)"
+7,dur,float,record total duration
+8,sbytes,integer,source to destination transaction bytes 
+9,dbytes,integer,destination to source transaction bytes
+10,sttl,integer,source to destination time to live value 
+11,dttl,integer,destination to source time to live value
+12,sloss,integer,source packets retransmitted or dropped 
+13,dloss,integer,destination packets retransmitted or dropped
+14,service,nominal,"http, ftp, smtp, ssh, dns, ftp-data ,irc  and (-) if not much used service"
+15,sload,float,source bits per second
+16,dload,float,destination bits per second
+17,spkts,integer,source to destination packet count 
+18,dpkts,integer,destination to source packet count
+19,swin,integer,source tcp window advertisement value
+20,dwin,integer,destination tcp window advertisement value
+21,stcpb,integer,source tcp base sequence number
+22,dtcpb,integer,destination tcp base sequence number
+23,smeansz,integer,mean of the ?ow packet size transmitted by the src 
+24,dmeansz,integer,mean of the ?ow packet size transmitted by the dst 
+25,trans_depth,integer,represents the pipelined depth into the connection of http request/response transaction
+26,res_bdy_len,integer,"actual uncompressed content size of the data transferred from the server's http service."
+27,sjit,float,source jitter (msec)
+28,djit,float,destination jitter (msec)
+29,stime,timestamp,record start time
+30,ltime,timestamp,record last time
+31,sintpkt,float,source interpacket arrival time (msec)
+32,dintpkt,float,destination interpacket arrival time (msec)
+33,tcprtt,float,"tcp connection setup round-trip time, the sum of synack and ackdat."
+34,synack,float,"tcp connection setup time, the time between the syn and the syn_ack packets."
+35,ackdat,float,"tcp connection setup time, the time between the syn_ack and the ack packets."
+36,is_sm_ips_ports,integer,"if source (1) and destination (3)ip addresses equal and port numbers (2)(4)  equal then, this variable takes value 1 else 0"
+37,ct_state_ttl,integer,no. for each state (6) according to specific range of values for source/destination time to live (10) (11).
+38,ct_flw_http_mthd,integer,no. of flows that has methods such as get and post in http service.
+39,is_ftp_login,integer,if the ftp session is accessed by user and password then 1 else 0. 
+40,ct_ftp_cmd,integer,no of flows that has a command in ftp session.
+41,ct_srv_src,integer,no. of connections that contain the same service (14) and source address (1) in 100 connections according to the last time (26).
+42,ct_srv_dst,integer,no. of connections that contain the same service (14) and destination address (3) in 100 connections according to the last time (26).
+43,ct_dst_ltm,integer,no. of connections of the same destination address (3) in 100 connections according to the last time (26).
+44,ct_src_ltm,integer,no. of connections of the same source address (1) in 100 connections according to the last time (26).
+45,ct_src_dport_ltm,integer,no of connections of the same source address (1) and the destination port (4) in 100 connections according to the last time (26).
+46,ct_dst_sport_ltm,integer,no of connections of the same destination address (3) and the source port (2) in 100 connections according to the last time (26).
+47,ct_dst_src_ltm,integer,no of connections of the same source (1) and the destination (3) address in in 100 connections according to the last time (26).
+48,attack_cat,nominal_label,"the name of each attack category. in this data set , nine categories e.g. fuzzers, analysis, backdoors, dos, exploits, generic, reconnaissance, shellcode and worms"
+49,label,binary_label,0 for normal and 1 for attack records
