@@ -1,8 +1,82 @@
 from __future__ import print_function
 import csv
+import io
+from sets import Set
 import numpy as np
+import pandas
 from sklearn.preprocessing import OneHotEncoder
 from netlearner.utils import maybe_npsave
+
+
+def generate_header(feature_names):
+    header = ''
+    for name in feature_names:
+        header += name + ','
+
+    return header
+
+
+def discovery_feature_volcabulary(filenames):
+    proto, state, service = Set(), Set(), Set()
+    for filename in filenames:
+        csv_file = open(filename, 'r')
+        csv_file.readline()
+        reader = csv.reader(csv_file, delimiter=',')
+        for row in reader:
+            proto.add(row[2])
+            state.add(row[4])
+            service.add(row[3])
+
+    proto = list(proto)
+    state = list(state)
+    service = list(service)
+    result = {'proto': proto, 'state': state, 'service': service}
+    for (key, value) in result.items():
+        print(key, value)
+
+    return result
+
+
+def get_feature_names(filename):
+    f = open(filename, 'r')
+    f.readline()  # skip description line
+    feature_names = []
+    symbolic = []
+    continuous = []
+    discrete = []
+    for line in f.readlines():
+        contents = line.strip('\n').split(',')
+        feature_names.append(contents[1])
+        if contents[2] == 'nominal':
+            symbolic.append(contents[1])
+        elif contents[2] == 'float':
+            continuous.append(contents[1])
+        elif contents[2] == 'integer':
+            discrete.append(contents[1])
+
+    return feature_names, symbolic, continuous, discrete
+
+
+def discovery_discrete_range(filenames, dnames, headers):
+    max_list = {x: 0 for x in dnames}
+    min_list = {x: 2424250010 for x in dnames}  # stime starts at 1.4 billion
+    for filename in filenames:
+        data_frame = pandas.read_csv(filename,
+                                     sep=',',
+                                     names=headers,
+                                     engine='python',
+                                     na_values='-',
+                                     nrows=1000)
+        # print(data_frame.shape)
+        for name in dnames:
+            column = data_frame[name]
+            max_list[name] = max(max_list[name], column.max(skipna=True))
+            min_list[name] = min(min_list[name], column.min(skipna=True))
+
+    for name in dnames:
+        print('%s ranges: [%s, %s]' % (name, min_list[name], max_list[name]))
+
+    return max_list, min_list
 
 
 def discovery_category_map(filenames):
