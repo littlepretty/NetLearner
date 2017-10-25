@@ -31,11 +31,11 @@ def load_nsl_dataset():
 
 def load_unsw_dataset():
     raw_train_dataset = np.load('UNSW/train_dataset.npy')
-    train_labels = np.load('UNSW/train_labels_bin.npy')
+    train_labels = np.load('UNSW/train_labels.npy')
     raw_valid_dataset = np.load('UNSW/valid_dataset.npy')
-    valid_labels = np.load('UNSW/valid_labels_bin.npy')
+    valid_labels = np.load('UNSW/valid_labels.npy')
     raw_test_dataset = np.load('UNSW/test_dataset.npy')
-    test_labels = np.load('UNSW/test_labels_bin.npy')
+    test_labels = np.load('UNSW/test_labels.npy')
     # train_dataset, valid_dataset, test_dataset = min_max_normalize(
     #    raw_train_dataset, raw_valid_dataset, raw_test_dataset)
     # print('Min-Max normalizing dataset')

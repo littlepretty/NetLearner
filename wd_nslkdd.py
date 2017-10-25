@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import pandas as pd
 import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler
 from preprocess.nslkdd import get_feature_names, get_categorical_values
 
 CSV_COLUMNS, symbolic_names, continuous_names = get_feature_names()
@@ -64,8 +65,8 @@ indicator_columns = [
     tf.feature_column.indicator_column(guest_login),
 ]
 embedding_columns = [
-    tf.feature_column.embedding_column(service, dimension=5),
-    tf.feature_column.embedding_column(flag, dimension=2),
+    tf.feature_column.embedding_column(service, dimension=6),
+    tf.feature_column.embedding_column(flag, dimension=3),
 ]
 deep_columns = continuous_columns + indicator_columns + embedding_columns
 print("size of deep columns", len(deep_columns))
@@ -78,13 +79,13 @@ def build_model(model_dir, model_type):
     elif model_type == 'deep':
         m = tf.estimator.DNNClassifier(
             model_dir=model_dir, feature_columns=deep_columns,
-            hidden_units=[400, 200, 50])
+            hidden_units=[640, 400])
     else:
         m = tf.estimator.DNNLinearCombinedClassifier(
             model_dir=model_dir,
             linear_feature_columns=wide_columns,
             dnn_feature_columns=deep_columns,
-            dnn_hidden_units=[400, 200, 50])
+            dnn_hidden_units=[640, 400])
 
     return m
 
@@ -108,8 +109,11 @@ def input_builder(data_file, num_epochs, shuffle):
 
     print('Raw dataset shape', data.shape)
     print('Raw label shape', labels.shape)
+    scaler = MinMaxScaler()
+    data[continuous_names] = scaler.fit_transform(data[continuous_names])
+
     return tf.estimator.inputs.pandas_input_fn(
-        x=data, y=labels, batch_size=40, num_epochs=num_epochs,
+        x=data, y=labels, batch_size=20, num_epochs=num_epochs,
         shuffle=shuffle, num_threads=4)
 
 
@@ -129,7 +133,7 @@ def train_and_eval(model_dir, model_type, train_steps,
 
 train_filename = 'NSLKDD/KDDTrain+.txt'
 test_filename = 'NSLKDD/KDDTest+.txt'
-model_dir = 'WideDeepModel'
+model_dir = None  # 'WideDeepModel'
 train_steps = 8000
 train_and_eval(model_dir, 'wide+deep', train_steps,
                train_filename, test_filename)

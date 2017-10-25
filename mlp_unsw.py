@@ -27,12 +27,12 @@ num_samples, feature_size = train_dataset.shape
 num_labels = train_labels.shape[1]
 batch_size = 80
 keep_prob = 0.80
-beta = 0.0001
-weights = [1.0, 100.0]
-num_epochs = [32]
+beta = 0.00008
+weights = [1.0, 1.0]
+num_epochs = [160]
 init_lrs = [0.001]
 hidden_layer_sizes = [
-                      [800],
+                      [400, 400, 400, 400],
                       # [800, 640], [160, 80], [80, 40],
                       # [400, 360, 320],
                       # [160, 120, 80], [120, 80, 40],
@@ -41,7 +41,7 @@ for hidden_layer_size in hidden_layer_sizes:
     for init_lr in init_lrs:
         for num_epoch in num_epochs:
             num_steps = int(train_dataset.shape[0] / batch_size * num_epoch)
-            decay_steps = num_steps / num_epoch
+            decay_steps = num_steps // num_epoch
             mp_classifier = MultilayerPerceptron(feature_size,
                                                  hidden_layer_size,
                                                  num_labels, init_lr,

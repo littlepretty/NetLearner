@@ -5,7 +5,7 @@ from __future__ import print_function
 import pandas as pd
 import tensorflow as tf
 from preprocess.full_unsw import get_feature_names, symbolic_features
-from preprocess.full_unsw import generate_header, discovery_discrete_range
+from preprocess.full_unsw import generate_header  # , discovery_discrete_range
 
 
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
@@ -50,7 +50,7 @@ print('#wide components:', len(wide_columns))
 
 # Build components for the deep model
 indicator_columns = []  # low dimension categorical features
-for name in symbolic_names:  # ['state', 'service']
+for name in ['state', 'service']:
     column = symbolic_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
 
@@ -64,14 +64,13 @@ for name in low_discrete_names:
 
 # convert high dimension categorical features to embeddings
 embedding_columns = []
-"""
 for (name, column) in symbolic_columns.items():
     volcabulary_size = len(symbolic_features[name])
-    # print(name, '|V| =', volcabulary_size)
+    print(name, '|V| =', volcabulary_size)
     dim = 4
     embedding = tf.feature_column.embedding_column(column, dim)
     embedding_columns.append(embedding)
-
+"""
 high_discrete_names = set(discrete_names).difference(set(low_discrete_names))
 for name in high_discrete_names:
     volcabulary_size = upper[name] - lower[name] + 1

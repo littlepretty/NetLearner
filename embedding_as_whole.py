@@ -66,7 +66,7 @@ model2.compile(loss='categorical_crossentropy',
                metrics=['accuracy'])
 history = model2.fit(X_train, train_labels,
                      batch_size=100,
-                     epochs=10,
+                     epochs=160,
                      verbose=1,
                      validation_data=(X_valid, valid_labels))
 score = model2.evaluate(X_test, test_labels, batch_size=100, verbose=1)

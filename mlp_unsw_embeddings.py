@@ -78,13 +78,13 @@ X_test, y_test = permutate_dataset(X_test, y_test, 'Test')
 num_samples, num_features = X_train.shape
 num_classes = y_train.shape[1]
 batch_size = 40
-keep_prob = 0.80
-beta = 0.0001
+keep_prob = 0.8
+beta = 0.000
 weights = [1.0, 1.0]
-num_epochs = [60]
+num_epochs = [160]
 init_lrs = [0.001]
 hidden_layer_sizes = [
-                      [480, 512, 640],
+                      [400, 200, 100],
                       # [800, 640], [160, 80], [80, 40],
                       # [400, 360, 320],
                       # [160, 120, 80], [120, 80, 40],

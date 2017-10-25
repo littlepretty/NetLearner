@@ -77,9 +77,9 @@ num_classes = y_train.shape[1]
 
 model2 = Sequential()
 model2.add(Dense(400, input_dim=num_features, activation='relu'))
-model2.add(Dropout(0.1))
+model2.add(Dropout(0.2))
 model2.add(Dense(512, activation='relu'))
-model2.add(Dropout(0.1))
+model2.add(Dropout(0.2))
 model2.add(Dense(640, activation='relu'))
 model2.add(Dense(num_classes, activation='softmax'))
 
@@ -94,6 +94,6 @@ history = model2.fit(X_train, y_train,
                      class_weight={0: 1, 1: 1},
                      shuffle=True,
                      validation_data=(X_valid, y_valid))
-score = model2.evaluate(X_test, y_test, batch_size=40, verbose=1)
+score = model2.evaluate(X_test, y_test, batch_size=64, verbose=1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
