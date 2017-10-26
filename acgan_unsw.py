@@ -5,6 +5,7 @@ from netlearner.utils import min_max_scale, permutate_dataset
 from netlearner.utils import plot_traffic_as_image
 from netlearner.ac_gan import AuxiliaryClassifierGAN
 from netlearner.utils import hyperparameter_summary
+from preprocess.unsw import generate_dataset
 from netlearner.multilayer_perceptron import MultilayerPerceptron
 from math import ceil
 
@@ -97,6 +98,7 @@ def classify(train_dataset, train_labels, valid_dataset, valid_labels,
 
 
 np.random.seed(1944)
+generate_dataset(True)
 raw_train_dataset = np.load('UNSW/train_dataset.npy')
 train_labels = np.load('UNSW/train_labels.npy')
 raw_valid_dataset = np.load('UNSW/valid_dataset.npy')

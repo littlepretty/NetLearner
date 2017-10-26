@@ -87,13 +87,14 @@ model2.add(Dense(num_classes, activation='softmax'))
 model2.compile(loss='categorical_crossentropy',
                optimizer='adam',
                metrics=['accuracy'])
+model2.summary()
 history = model2.fit(X_train, y_train,
-                     batch_size=64,
+                     batch_size=160,
                      epochs=160,
                      verbose=1,
                      class_weight={0: 1, 1: 1},
                      shuffle=True,
                      validation_data=(X_valid, y_valid))
-score = model2.evaluate(X_test, y_test, batch_size=64, verbose=1)
+score = model2.evaluate(X_test, y_test, batch_size=100, verbose=1)
 print('Test loss:', score[0])
 print('Test accuracy:', score[1])
