@@ -30,7 +30,7 @@ def plot_dist_comp(data, label, name, dirname):
                                         bins='auto', normed=0, color='r',
                                         label='Attack', histtype='step')
     ax.set_xlabel('Feature %s value range' % name)
-    ax.set_ylabel('Probability density')
+    ax.set_ylabel('Histogram')  # ('Probability density')
     ax.legend(loc='best')
     fig.tight_layout()
     plt.savefig('%s/%s_dist_comp.png' % (dirname, name), dpi=400)
@@ -42,7 +42,7 @@ def plot_dist(data, name, dirname):
     fig, ax = plt.subplots()
     n_nt, bins_nt, patches_nt = ax.hist(data, bins=100, normed=0, label=name)
     ax.set_xlabel('Feature %s value range' % name)
-    ax.set_ylabel('Probability density')
+    ax.set_ylabel('Histogram')  # ('Probability density')
     ax.legend(loc='best')
     fig.tight_layout()
     plt.savefig('%s/%s_dist_comp.png' % (dirname, name), dpi=400)
