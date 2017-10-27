@@ -1,6 +1,5 @@
 from __future__ import print_function
 import csv
-import io
 from sets import Set
 import numpy as np
 import pandas
@@ -32,7 +31,7 @@ def discovery_feature_volcabulary(filenames):
     service = list(service)
     result = {'proto': proto, 'state': state, 'service': service}
     for (key, value) in result.items():
-        print(key, value)
+        print(key, value, len(value))
 
     return result
 
@@ -66,17 +65,22 @@ def discovery_discrete_range(filenames, dnames, headers):
                                      names=headers,
                                      engine='python',
                                      na_values='-',
-                                     nrows=1000)
-        # print(data_frame.shape)
+                                     skiprows=1)
+        print(data_frame.shape)
         for name in dnames:
             column = data_frame[name]
             max_list[name] = max(max_list[name], column.max(skipna=True))
             min_list[name] = min(min_list[name], column.min(skipna=True))
 
+    small_ranges = []
     for name in dnames:
         print('%s ranges: [%s, %s]' % (name, min_list[name], max_list[name]))
+        if max_list[name] - min_list[name] < 256:
+            small_ranges.append(name)
 
-    return max_list, min_list
+    print(small_ranges)
+
+    return max_list, min_list, small_ranges
 
 
 def discovery_category_map(filenames):
@@ -237,5 +241,11 @@ def generate_dataset(one_hot_encode=True):
 
 
 if __name__ == '__main__':
-    generate_dataset(True)
+    # generate_dataset(True)
     # generate_dataset(False)
+    filenames = ['UNSW/UNSW_NB15_%s-set.csv' % x
+                 for x in ['training', 'testing']]
+    # discovery_category_map(filenames)
+    filename = 'UNSW/feature_names_train_test.csv'
+    headers, _, _, dnames = get_feature_names(filename)
+    discovery_discrete_range(filenames, dnames, headers)

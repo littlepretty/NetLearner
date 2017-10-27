@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import tensorflow as tf
-from netlearner.utils import min_max_scale, permutate_dataset
+from netlearner.utils import augment_quantiled, permutate_dataset
 from netlearner.utils import plot_traffic_as_image
 from netlearner.ac_gan import AuxiliaryClassifierGAN
 from netlearner.utils import hyperparameter_summary
@@ -105,8 +105,10 @@ raw_valid_dataset = np.load('UNSW/valid_dataset.npy')
 valid_labels = np.load('UNSW/valid_labels.npy')
 raw_test_dataset = np.load('UNSW/test_dataset.npy')
 test_labels = np.load('UNSW/test_labels.npy')
-[train_dataset, valid_dataset, test_dataset] = min_max_scale(
-    raw_train_dataset, raw_valid_dataset, raw_test_dataset)
+columns = np.array(range(1, 27))
+[train_dataset, valid_dataset, test_dataset] = augment_quantiled(
+    raw_train_dataset, raw_valid_dataset, raw_test_dataset, columns)
+
 train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
 valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
 test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
