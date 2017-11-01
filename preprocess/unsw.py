@@ -56,7 +56,7 @@ def get_feature_names(filename):
     return feature_names, symbolic, continuous, discrete
 
 
-def discovery_discrete_range(filenames, dnames, headers):
+def discovery_range(filenames, dnames, headers):
     max_list = {x: 0 for x in dnames}
     min_list = {x: 2424250010 for x in dnames}  # stime starts at 1.4 billion
     for filename in filenames:
@@ -81,6 +81,32 @@ def discovery_discrete_range(filenames, dnames, headers):
     print(small_ranges)
 
     return max_list, min_list, small_ranges
+
+
+def discovery_integer_map(feature_file, dataset_names):
+    headers, _, _, dnames = get_feature_names(feature_file)
+    max_list, min_list, _ = discovery_range(dataset_names,
+                                            dnames, headers)
+    result = {}
+    for (name, maximum) in max_list.items():
+        result[name] = {'min': min_list[name], 'max': max_list[name]}
+
+    return result
+
+
+def discovery_continuous_map(feature_file, dataset_names):
+    headers, _, cnames, _ = get_feature_names(filename)
+    max_list, min_list, _ = discovery_range(dataset_names,
+                                            cnames, headers)
+    result = {}
+    for (name, maximum) in max_list.items():
+        result[name] = {'min': min_list[name], 'max': max_list[name]}
+
+    return result
+
+
+def discovery_discrete_range(filenames, dnames, headers):
+    return discovery_range(filenames, dnames, headers)
 
 
 def discovery_category_map(filenames):
@@ -247,5 +273,6 @@ if __name__ == '__main__':
                  for x in ['training', 'testing']]
     # discovery_category_map(filenames)
     filename = 'UNSW/feature_names_train_test.csv'
+    discovery_feature_volcabulary(filenames)
     headers, _, _, dnames = get_feature_names(filename)
     discovery_discrete_range(filenames, dnames, headers)
