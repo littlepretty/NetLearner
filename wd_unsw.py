@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from preprocess.unsw import get_feature_names, discovery_feature_volcabulary
-from preprocess.unsw import generate_header  # , discovery_discrete_range
+from preprocess.unsw import generate_header, discovery_discrete_range
 
 
 def build_model(model_dir, model_type):
@@ -63,19 +63,25 @@ def augment_dataset(filename, output='train'):
 
 def input_builder(filename, full_columns, num_epochs, shuffle):
     print('dealing with %s' % filename)
+    types = dict()
+    for name in discrete_names:
+        types[name] = np.int32
+
     df = pd.read_csv(filename,
                      names=full_columns,
                      sep=',',
                      skipinitialspace=True,
                      skiprows=1,
-                     engine='python')
+                     engine='python',
+                     dtype=types)
+
     labels = df['label'].astype(int)
     dataset = df.drop('label', axis=1)
     print('Raw dataset shape:', dataset.shape)
     print('Raw label shape:', labels.shape)
 
     return tf.estimator.inputs.pandas_input_fn(
-        x=dataset, y=labels, batch_size=160, num_epochs=num_epochs,
+        x=dataset, y=labels, batch_size=128, num_epochs=num_epochs,
         shuffle=shuffle, num_threads=1)
 
 
@@ -100,6 +106,8 @@ test_filename = 'UNSW/UNSW_NB15_testing-set.csv'
 feature_filename = 'UNSW/feature_names_train_test.csv'
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
     get_feature_names(feature_filename)
+upper, lower, small_ranges = discovery_discrete_range(
+    [train_filename, test_filename], discrete_names, CSV_COLUMNS)
 quantile_names = []
 for name in continuous_names + discrete_names:
     quantile_names.append(name + '_quantile')
@@ -135,14 +143,10 @@ for name in quantile_names:
 
 # convert discrete features into categorical columns
 discrete_columns = dict()
-"""
-upper, lower = discovery_discrete_range(filenames,
-discrete_names, CSV_COLUMNS)
-for name in discrete_names:
+for name in small_ranges:
     column = tf.feature_column.categorical_column_with_identity(
-    name, upper[name] - lower[name] + 1)
+        name, num_buckets=upper[name] - lower[name] + 1)
     discrete_columns[name] = column
-    """
 
 # Build components for the wide model
 base_columns = symbolic_columns.values() + discrete_columns.values()
@@ -161,7 +165,7 @@ print('#wide components:', len(wide_columns))
 
 # Build components for the deep model
 indicator_columns = []  # low dimension categorical features
-for name in symbolic_names:  # ['state', 'service']
+for name in ['state', 'service']:
     column = symbolic_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
 
@@ -173,7 +177,7 @@ low_discrete_names = ['trans_depth', 'ct_state_ttl',
 for name in low_discrete_names:
     column = discrete_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
-    """
+"""
 
 # convert high dimension categorical features to embeddings
 embedding_columns = []
@@ -181,31 +185,33 @@ for (name, column) in symbolic_columns.items():
     volcabulary_size = len(symbolic_features[name])
     print(name, '|V| =', volcabulary_size)
     dim = np.ceil(np.log2(volcabulary_size))
+    print('Embedding size of %s is %d' % (name, dim))
     embedding = tf.feature_column.embedding_column(column, dim)
     embedding_columns.append(embedding)
 
+
+for (name, column) in discrete_columns.items():
+    volcabulary_size = upper[name] - lower[name] + 1
+    print(name, '|V| =', volcabulary_size)
+    dim = min(5, np.ceil(np.log2(volcabulary_size)))
+    print('Embedding size of %s is %d' % (name, dim))
+    embedding = tf.feature_column.embedding_column(column, int(dim))
+    embedding_columns.append(embedding)
+
+
 print('embedding columns', len(embedding_columns))
-"""
-high_discrete_names = set(discrete_names).difference(set(low_discrete_names))
-for name in high_discrete_names:
-volcabulary_size = upper[name] - lower[name] + 1
-# print(name, '|V| =', volcabulary_size)
-dim = 4
-column = discrete_columns[name]
-embedding = tf.feature_column.embedding_column(column, dim)
-embedding_columns.append(embedding)
-"""
+
 deep_columns = indicator_columns + embedding_columns \
     + continuous_columns.values()
 print('#deep components:', len(deep_columns))
 
-train_steps = 160000
+train_steps = 180000
 # train_temp, full_columns = augment_dataset(train_filename)
 # test_temp, full_columns = augment_dataset(test_filename, 'test')
 full_columns = symbolic_names + continuous_names + \
     discrete_names + quantile_names + ['label']
 train_temp = 'UNSW/train_temp.csv'
 test_temp = 'UNSW/test_temp.csv'
-model_dir = None  # 'WideDeepModel'
+model_dir = 'WideDeepModel'
 train_and_eval(model_dir, 'wide+deep', train_steps,
                train_temp, test_temp, full_columns)
