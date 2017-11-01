@@ -75,11 +75,10 @@ def discovery_discrete_range(filenames, dnames, headers):
     small_ranges = []
     for name in dnames:
         print('%s ranges: [%s, %s]' % (name, min_list[name], max_list[name]))
-        if max_list[name] - min_list[name] < 256:
+        if max_list[name] - min_list[name] < 12000:
             small_ranges.append(name)
 
-    print(small_ranges)
-
+    print('features with small value range:', small_ranges)
     return max_list, min_list, small_ranges
 
 
