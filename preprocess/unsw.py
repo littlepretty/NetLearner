@@ -15,7 +15,7 @@ def generate_header(feature_names):
     return header
 
 
-def discovery_feature_volcabulary(filenames):
+def discovery_feature_volcabulary(filenames, verbose=False):
     proto, state, service = Set(), Set(), Set()
     for filename in filenames:
         csv_file = open(filename, 'r')
@@ -30,8 +30,9 @@ def discovery_feature_volcabulary(filenames):
     state = list(state)
     service = list(service)
     result = {'proto': proto, 'state': state, 'service': service}
-    for (key, value) in result.items():
-        print(key, value, len(value))
+    if verbose is True:
+        for (key, value) in result.items():
+            print(key, value, len(value))
 
     return result
 
@@ -66,7 +67,6 @@ def discovery_range(filenames, dnames, headers):
                                      engine='python',
                                      na_values='-',
                                      skiprows=1)
-        print(data_frame.shape)
         for name in dnames:
             column = data_frame[name]
             max_list[name] = max(max_list[name], column.max(skipna=True))
@@ -74,11 +74,11 @@ def discovery_range(filenames, dnames, headers):
 
     small_ranges = []
     for name in dnames:
-        print('%s ranges: [%s, %s]' % (name, min_list[name], max_list[name]))
+        # print('%s ranges: [%s, %s]' % (name, min_list[name], max_list[name]))
         if max_list[name] - min_list[name] < 12000:
             small_ranges.append(name)
 
-    print('features with small value range:', small_ranges)
+    # print('features with small value range:', small_ranges)
     return max_list, min_list, small_ranges
 
 
@@ -94,7 +94,7 @@ def discovery_integer_map(feature_file, dataset_names):
 
 
 def discovery_continuous_map(feature_file, dataset_names):
-    headers, _, cnames, _ = get_feature_names(filename)
+    headers, _, cnames, _ = get_feature_names(feature_file)
     max_list, min_list, _ = discovery_range(dataset_names,
                                             cnames, headers)
     result = {}
