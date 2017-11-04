@@ -4,7 +4,7 @@ from keras.layers import Embedding, BatchNormalization
 
 from preprocess.unsw import get_feature_names, discovery_feature_volcabulary
 from preprocess.unsw import discovery_integer_map, discovery_continuous_map
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, LabelBinarizer
 
 import pandas as pd
 import numpy as np
@@ -20,7 +20,10 @@ df = pd.read_csv(dataset_names[0],
                  names=headers, sep=',',
                  skipinitialspace=True, skiprows=1, engine='python')
 X = df.drop('attack_cat', axis=1)
-Y = df['label'].astype(int)
+labels = df['label'].astype(int)
+lb = LabelBinarizer()
+y = lb.fit_transform(labels.as_matrix())
+
 train_dict = dict()
 merged_dim = 0
 merged_inputs = []
@@ -89,12 +92,12 @@ h1 = Dense(400, activation='relu', name='hidden1')(merge)
 encode = BatchNormalization(name='unified_x')(h1)
 
 h4 = Dense(1024, activation='sigmoid', name='hidden_all')(encode)
-sm = Dense(1, activation='softmax', name='output')(h4)
+sm = Dense(2, activation='softmax', name='output')(h4)
 
 print('input/output dict %s' % train_dict)
 model = Model(inputs=merged_inputs, outputs=sm)
 model.compile(optimizer='adam', loss='binary_crossentropy',
               metrics=['accuracy'])
 model.summary()
-model.fit(train_dict, {'output': Y.as_matrix()},
+model.fit(train_dict, {'output': y},
           epochs=1, batch_size=40)
