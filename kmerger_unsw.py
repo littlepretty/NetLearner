@@ -113,13 +113,13 @@ encode = BatchNormalization(name='unified_x')(h1)
 h4 = Dense(640, activation='sigmoid', name='hidden_all')(encode)
 sm = Dense(2, activation='softmax', name='output')(h4)
 
-print('input/output dict %s' % train_dict)
 model = Model(inputs=merged_inputs, outputs=sm)
 model.compile(optimizer='adam', loss='binary_crossentropy',
               metrics=['accuracy'])
 model.summary()
 history = model.fit(train_dict, {'output': y},
-                    epochs=60, batch_size=40)
+                    epochs=3, batch_size=80)
 print(history.history)
-score = model.evaluate(test_dict, test_y, verbose=1)
+score = model.evaluate(test_dict, test_y,
+                       batch_size=test_y.shape[0], verbose=1)
 print(score)

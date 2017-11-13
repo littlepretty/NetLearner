@@ -5,6 +5,8 @@ import csv
 import os
 import sys
 import numpy as np
+import pandas
+import logging
 from sklearn.preprocessing import OneHotEncoder
 # import argparse
 
@@ -320,11 +322,12 @@ def generate_datasets():
     generate_valid_test_dataset(dataset, labels, dist)
 
 
-def get_feature_names():
-    f = open('NSLKDD/feature_names.txt', 'r')
+def get_feature_names(feature_file):
+    f = open(feature_file, 'r')
     f.readline()  # skip column head
     feature_names = []
     symbolic = []
+    discrete = []
     continuous = []
     for line in f.readlines():
         contents = line.strip('\n').split(' ')
@@ -333,8 +336,10 @@ def get_feature_names():
             symbolic.append(contents[1])
         elif contents[2] == 'continuous':
             continuous.append(contents[1])
+        elif contents[2] == 'integer':
+            discrete.append(contents[1])
 
-    return feature_names, symbolic, continuous
+    return feature_names, symbolic, continuous, discrete
 
 
 def get_categorical_values(name):
@@ -355,6 +360,58 @@ def get_categorical_values(name):
         feature = guest_login_types
 
     return feature.keys() if feature is not None else None
+
+
+def discovery_range(filenames, dnames, headers):
+    max_list = {x: 0 for x in dnames}
+    min_list = {x: 2424250010 for x in dnames}  # stime starts at 1.4 billion
+    for filename in filenames:
+        data_frame = pandas.read_csv(filename,
+                                     sep=',',
+                                     names=headers,
+                                     engine='python',
+                                     na_values='-',
+                                     skiprows=1)
+        for name in dnames:
+            column = data_frame[name]
+            max_list[name] = max(max_list[name], column.max(skipna=True))
+            min_list[name] = min(min_list[name], column.min(skipna=True))
+
+    return max_list, min_list
+
+
+def discovery_integer_map(feature_file, dataset_names):
+    headers, _, _, dnames = get_feature_names(feature_file)
+    max_list, min_list = discovery_range(dataset_names,
+                                         dnames, headers)
+    result = {}
+    for (name, maximum) in max_list.items():
+        result[name] = {'min': min_list[name], 'max': max_list[name]}
+
+    return result
+
+
+def discovery_continuous_map(feature_file, dataset_names):
+    headers, _, cnames, _ = get_feature_names(feature_file)
+    max_list, min_list = discovery_range(dataset_names,
+                                         cnames, headers)
+    result = {}
+    for (name, maximum) in max_list.items():
+        result[name] = {'min': min_list[name], 'max': max_list[name]}
+
+    return result
+
+
+def discovery_feature_volcabulary(filenames, verbose=True):
+    features = dict()
+    features['protocol'] = protocol_types.keys()
+    features['service'] = service_types.keys()
+    features['flag'] = flag_types.keys()
+    features['land'] = land_types.keys()
+    features['login'] = login_types.keys()
+    features['host_login'] = host_login_types.keys()
+    features['guest_login'] = guest_login_types.keys()
+    return features
 
 
 if __name__ == '__main__':

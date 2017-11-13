@@ -1,9 +1,0 @@
-3 protocol types:  {'udp': 1, 'icmp': 2, 'tcp': 0}
-
-70 service types:  {'urp_i': 11, 'netbios_ssn': 51, 'Z39_50': 40, 'tim_i': 68, 'smtp': 1, 'domain': 22, 'private': 12, 'echo': 18, 'printer': 50, 'red_i': 69, 'eco_i': 6, 'sunrpc': 43, 'ftp_data': 14, 'urh_i': 62, 'pm_dump': 38, 'pop_3': 13, 'pop_2': 52, 'systat': 30, 'ftp': 7, 'uucp': 37, 'whois': 21, 'tftp_u': 66, 'netbios_dgm': 41, 'efs': 54, 'remote_job': 25, 'sql_net': 57, 'daytime': 16, 'ntp_u': 8, 'finger': 4, 'ldap': 42, 'netbios_ns': 60, 'kshell': 61, 'iso_tsap': 59, 'ecr_i': 9, 'nntp': 36, 'http_2784': 63, 'shell': 33, 'domain_u': 2, 'uucp_path': 56, 'courier': 44, 'exec': 45, 'aol': 65, 'netstat': 15, 'telnet': 5, 'gopher': 24, 'rje': 26, 'hostnames': 55, 'link': 29, 'ssh': 17, 'http_443': 48, 'csnet_ns': 47, 'X11': 32, 'IRC': 39, 'harvest': 64, 'imap4': 35, 'icmp': 70, 'supdup': 28, 'name': 20, 'nnsp': 53, 'mtp': 23, 'http': 0, 'bgp': 46, 'ctf': 27, 'klogin': 49, 'vmnet': 58, 'time': 19, 'discard': 31, 'login': 34, 'auth': 3, 'other': 10, 'http_8001': 67}
-
-11 flag types:  {'OTH': 4, 'RSTR': 8, 'S3': 3, 'S2': 1, 'S1': 2, 'S0': 7, 'RSTOS0': 9, 'REJ': 5, 'SH': 10, 'RSTO': 6, 'SF': 0}
-
-8 bool types: land, login, host_login, guest_login
-
-40 target types:  {'guess_passwd': 6, 'spy': 21, 'named': 24, 'ftp_write': 12, 'processtable': 33, 'nmap': 17, 'back': 13, 'multihop': 18, 'rootkit': 22, 'udpstorm': 30, 'snmpguess': 39, 'pod': 7, 'apache2': 29, 'sqlattack': 38, 'portsweep': 9, 'ps': 34, 'httptunnel': 35, 'sendmail': 27, 'snmpgetattack': 23, 'perl': 3, 'ipsweep': 10, 'teardrop': 8, 'satan': 15, 'loadmodule': 2, 'buffer_overflow': 1, 'mailbomb': 37, 'mscan': 32, 'saint': 28, 'normal': 0, 'xterm': 31, 'phf': 16, 'warezmaster': 19, 'imap': 14, 'warezclient': 20, 'land': 11, 'neptune': 4, 'worm': 36, 'xlock': 25, 'smurf': 5, 'xsnoop': 26}
