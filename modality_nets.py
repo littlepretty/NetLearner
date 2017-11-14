@@ -2,6 +2,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, concatenate, Flatten, Dropout
 from keras import regularizers
 from keras.layers import Embedding, BatchNormalization
+from keras.callbacks import CSVLogger
 
 from preprocess import unsw, nslkdd
 from netlearner.utils import permutate_dataset
@@ -56,7 +57,7 @@ def build_embeddings(symbolic_features, integer_features,
 
         dim_V = len(values)
         dim_E = int(min(7, np.ceil(np.log2(dim_V))))
-        logger.info('Dimension of %s E=%s and V=%s' % (name, dim_E, dim_V))
+        logger.debug('Dimension of %s E=%s and V=%s' % (name, dim_E, dim_V))
         temp = Embedding(output_dim=dim_E, input_dim=dim_V,
                          input_length=1, name='embed_%s' % feature_name)(column)
         temp = Flatten(name='flat_%s' % feature_name)(temp)
@@ -78,7 +79,7 @@ def build_embeddings(symbolic_features, integer_features,
             train_dict[feature_name] = raw_data - values['min']
             test_dict[feature_name] = test_raw_data - values['min']
             dim_E = int(min(5, np.ceil(np.log2(dim_V))))
-            logger.info('Dimension of %s E=%s and V=%s' % (name, dim_E, dim_V))
+            logger.debug('Dimension of %s E=%s and V=%s' % (name, dim_E, dim_V))
             temp = Embedding(output_dim=dim_E, input_dim=dim_V,
                              input_length=1,
                              name='embed_%s' % feature_name)(column)
@@ -87,8 +88,8 @@ def build_embeddings(symbolic_features, integer_features,
             merged_dim += dim_E
         else:
             large_discrete.append(column)
-            logger.info('Large feature %s is treated as continuous'
-                        % feature_name)
+            logger.debug('[%s] is too large so is treated as continuous'
+                         % feature_name)
             mm = MinMaxScaler()
             raw_data = raw_data.reshape((len(raw_data), 1))
             test_raw_data = test_raw_data.reshape((len(test_raw_data), 1))
@@ -115,7 +116,7 @@ def build_continuous(continuous_features, merged_inputs,
     return continuous_inputs
 
 
-def modality_net_unsw(num_epochs, batch_size, reg_beta):
+def modality_net_unsw(united, num_epochs, batch_size, reg_beta):
     dataset_names = ['UNSW/UNSW_NB15_%s-set.csv' % x
                      for x in ['training', 'testing']]
     feature_file = 'UNSW/feature_names_train_test.csv'
@@ -141,7 +142,7 @@ def modality_net_unsw(num_epochs, batch_size, reg_beta):
     cont_component = build_continuous(continuous_features,
                                       merged_inputs, X, test_X,
                                       train_dict, test_dict, 'unsw')
-    logger.info('merge input_dim for this dataset = %s' % merged_dim)
+    logger.info('merge input_dim for UNSW-NB dataset = %s' % merged_dim)
 
     merge = concatenate(embeddings + large_discrete + [cont_component],
                         name='concate_features_unsw')
@@ -149,13 +150,13 @@ def modality_net_unsw(num_epochs, batch_size, reg_beta):
                kernel_regularizer=regularizers.l2(reg_beta))(merge)
     dropout = Dropout(0.2)(h1)
     bn = BatchNormalization(name='bn_unsw_1')(dropout)
-    h2 = Dense(500, activation='relu', name='unified_unsw',
+    h2 = Dense(united, activation='sigmoid', name='unified_unsw',
                kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    dropout = Dropout(0.2)(h2)
-    bn = BatchNormalization(name='bn_nsl_2')(dropout)
-    h3 = Dense(600, activation='relu', name='separate_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    sm = Dense(2, activation='softmax', name='output')(h3)
+    # dropout = Dropout(0.2)(h2)
+    # bn = BatchNormalization(name='bn_nsl_2')(dropout)
+    # h3 = Dense(600, activation='relu', name='separate_nsl',
+               # kernel_regularizer=regularizers.l2(reg_beta))(bn)
+    sm = Dense(2, activation='softmax', name='output')(h2)
 
     model = Model(inputs=merged_inputs, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
@@ -180,7 +181,7 @@ def modality_net_unsw(num_epochs, batch_size, reg_beta):
     return EX, EX_test, y, test_y
 
 
-def modality_net_nsl(num_epochs, batch_size, reg_beta=0.001):
+def modality_net_nsl(united, num_epochs, batch_size, reg_beta=0.001):
     dataset_names = ['NSLKDD/KDD%s.csv' % x for x in ['Train', 'Test']]
     feature_file = 'NSLKDD/feature_names.csv'
     headers, _, _, _ = nslkdd.get_feature_names(feature_file)
@@ -204,7 +205,7 @@ def modality_net_nsl(num_epochs, batch_size, reg_beta=0.001):
     cont_component = build_continuous(continuous_features,
                                       merged_inputs, X, test_X,
                                       train_dict, test_dict, 'nsl')
-    logger.info('merge input_dim for this dataset = %s' % merged_dim)
+    logger.info('merge input_dim for NSLKDD dataset = %s' % merged_dim)
 
     merge = concatenate(embeddings + large_discrete + [cont_component],
                         name='concate_features_nsl')
@@ -212,13 +213,13 @@ def modality_net_nsl(num_epochs, batch_size, reg_beta=0.001):
                kernel_regularizer=regularizers.l2(reg_beta))(merge)
     dropout = Dropout(0.2)(h1)
     bn = BatchNormalization(name='bn_nsl_1')(dropout)
-    h2 = Dense(500, activation='relu', name='unified_nsl',
+    h2 = Dense(united, activation='sigmoid', name='unified_nsl',
                kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    dropout = Dropout(0.2)(h2)
-    bn = BatchNormalization(name='bn_nsl_2')(dropout)
-    h3 = Dense(600, activation='relu', name='separate_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    sm = Dense(2, activation='softmax', name='output')(h3)
+    # dropout = Dropout(0.2)(h2)
+    # bn = BatchNormalization(name='bn_nsl_2')(dropout)
+    # h3 = Dense(600, activation='relu', name='separate_nsl',
+               # kernel_regularizer=regularizers.l2(reg_beta))(bn)
+    sm = Dense(2, activation='softmax', name='output')(h2)
 
     model = Model(inputs=merged_inputs, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
@@ -244,14 +245,16 @@ def modality_net_nsl(num_epochs, batch_size, reg_beta=0.001):
     return EX, EX_test, y, test_y
 
 
-def master_model(reg_beta=0.001):
-    main_input = Input(shape=(500,), name='main_input')
-    h1 = Dense(600, activation='relu', name='h1',
+def master_model(united, reg_beta=0.001):
+    main_input = Input(shape=(united,), name='main_input')
+    h1 = Dense(800, activation='relu', name='h1',
                kernel_regularizer=regularizers.l2(reg_beta))(main_input)
     dropout = Dropout(0.2)(h1)
-    bn = BatchNormalization(name='bn')(dropout)
-    h2 = Dense(800, activation='relu', name='h2',
+    bn = BatchNormalization(name='bn_1')(dropout)
+    h2 = Dense(400, activation='sigmoid', name='h2',
                kernel_regularizer=regularizers.l2(reg_beta))(bn)
+    # dropout = Dropout(0.2)(h2)
+    # bn = BatchNormalization(name='bn_2')(dropout)
     sm = Dense(2, activation='softmax', name='output')(h2)
     model = Model(inputs=main_input, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
@@ -261,9 +264,19 @@ def master_model(reg_beta=0.001):
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-EX1, EXT1, y1, test_y1 = modality_net_unsw(10, 80, 0.001)
-EX2, EXT2, y2, test_y2 = modality_net_nsl(10, 80, 0.001)
+logger = logging.getLogger('modality_nets')
+hdlr = logging.FileHandler('ModalityNets/accuracy_comp.log')
+formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.INFO)
+
+united = 640
+num_epochs = 10
+batch_size = 80
+beta = 0.00
+EX1, EXT1, y1, test_y1 = modality_net_unsw(united, num_epochs, batch_size, beta)
+EX2, EXT2, y2, test_y2 = modality_net_nsl(united, num_epochs, batch_size, beta)
 EX = np.concatenate((EX1, EX2), axis=0)
 EXT = np.concatenate((EXT1, EXT2), axis=0)
 Ey = np.concatenate((y1, y2), axis=0)
@@ -271,12 +284,12 @@ EyT = np.concatenate((test_y1, test_y2), axis=0)
 dataset = dict()
 dataset['train'], dataset['train_label'] = permutate_dataset(EX, Ey)
 dataset['test'], dataset['test_label'] = permutate_dataset(EXT, EyT)
-model = master_model(0.001)
-num_epochs = 10
-batch_size = 80
+model = master_model(united, beta)
+csv_logger = CSVLogger('ModalityNets/history.log', append=True)
 history = model.fit(dataset['train'], dataset['train_label'],
                     epochs=num_epochs, batch_size=batch_size, shuffle=True,
-                    steps_per_epoch=None)
+                    steps_per_epoch=None, callbacks=[csv_logger],
+                    validation_data=(EXT2, test_y2))
 score = model.evaluate(EXT1, test_y1, test_y1.shape[0], verbose=1)
 logger.info('UNSW test loss %.6f' % score[0])
 logger.info('UNSW test accu %.6f' % score[1])
