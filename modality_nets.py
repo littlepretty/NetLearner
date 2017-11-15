@@ -168,13 +168,15 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
     model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
     model.summary()
+    csv_logger = CSVLogger('ModalityNets/mn_UNSW.history', append=True)
     history = model.fit(train_dict, {'output': y}, shuffle=True,
                         epochs=num_epochs, batch_size=batch_size,
+                        callbacks=[csv_logger],
                         validation_data=(test_dict, test_y))
     logger.debug(history)
     score = model.evaluate(test_dict, test_y, test_y.shape[0], verbose=1)
-    logger.debug('Modality Net UNSW test loss\t%.6f' % score[0])
-    logger.info('Modality Net UNSW test accu\t%.6f' % score[1])
+    logger.debug('ModalityNet UNSW test loss\t%.6f' % score[0])
+    logger.info('ModalityNet UNSW test accu\t%.6f' % score[1])
 
     EX, EX_test = get_intermediate_output(model, 'unified_unsw', merged_inputs,
                                           train_dict, test_dict)
@@ -225,13 +227,15 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
     model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
     model.summary()
+    csv_logger = CSVLogger('ModalityNets/mn_NSL.history', append=True)
     history = model.fit(train_dict, {'output': y}, shuffle=True,
                         epochs=num_epochs, batch_size=batch_size,
+                        callbacks=[csv_logger],
                         validation_data=(test_dict, test_y))
     logger.debug(history)
     score = model.evaluate(test_dict, test_y, test_y.shape[0], verbose=1)
-    logger.debug('Modality Net NSL test loss\t%.6f' % score[0])
-    logger.info('Modality Net NSL test accu\t%.6f' % score[1])
+    logger.debug('ModalityNet NSL test loss\t%.6f' % score[0])
+    logger.info('ModalityNet NSL test accu\t%.6f' % score[1])
 
     EX, EX_test = get_intermediate_output(model, 'unified_nsl', merged_inputs,
                                           train_dict, test_dict)
@@ -258,35 +262,38 @@ def master_model(hidden, drop_prob=0.2, reg_beta=0.001):
     return model
 
 
-def train_with_single(hidden, EX, y, EXTs, test_ys, name,
+def train_with_single(hidden, EX, y, EXTs, test_ys, idx, drop_prob,
                       names=['UNSW', 'NSL']):
-    model = master_model(hidden, drop_prob=0.0, reg_beta=0.00)
-    csv_logger = CSVLogger('ModalityNets/training_history.log', append=True)
+    model = master_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
+    csv_logger = CSVLogger('ModalityNets/master_%s.history' % names[idx],
+                           append=True)
     history = model.fit(EX, y, epochs=num_epochs, batch_size=batch_size,
                         shuffle=True, steps_per_epoch=None,
-                        callbacks=[csv_logger])
+                        callbacks=[csv_logger],
+                        validation_data=(EXTs[idx], test_ys[idx]))
     for (i, EXT) in enumerate(EXTs):
         score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
         logger.debug('Master model trained with %s dataset %s test loss\t%.6f' %
-                     (name, names[i], score[0]))
+                     (names[idx], names[i], score[0]))
         logger.info('Master model trained with %s dataset %s test accu\t%.6f' %
-                    (name, names[i], score[1]))
+                    (names[idx], names[i], score[1]))
     return history
 
 
-def train_with_both(hidden, EXs, ys, EXTs, test_ys, names=['UNSW', 'NSL']):
+def train_with_both(hidden, EXs, ys, EXTs, test_ys, drop_prob,
+                    names=['UNSW', 'NSL']):
     EX = np.concatenate(EXs, axis=0)
     Ey = np.concatenate(ys, axis=0)
-    model = master_model(hidden, drop_prob=0.0, reg_beta=0.00)
-    csv_logger = CSVLogger('ModalityNets/training_history.log', append=True)
+    model = master_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
+    csv_logger = CSVLogger('ModalityNets/master_BOTH.history', append=True)
     history = model.fit(EX, Ey, epochs=num_epochs,
                         batch_size=batch_size, shuffle=True,
                         steps_per_epoch=None, callbacks=[csv_logger])
     for (i, EXT) in enumerate(EXTs):
         score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
-        logger.debug('Master model with BOTH dataset %s test loss\t%.6f' %
+        logger.debug('Master with BOTH dataset %s test loss\t%.6f' %
                      (names[i], score[0]))
-        logger.info('Master model with BOTH dataset %s test accu\t%.6f' %
+        logger.info('Master with BOTH dataset %s test accu\t%.6f' %
                     (names[i], score[1]))
 
     return history
@@ -294,8 +301,8 @@ def train_with_both(hidden, EXs, ys, EXTs, test_ys, names=['UNSW', 'NSL']):
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('modality_nets')
-hdlr = logging.FileHandler('ModalityNets/accuracy_comp.log')
-formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+hdlr = logging.FileHandler('ModalityNets/accuracy.log')
+formatter = logging.Formatter('%(asctime)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
@@ -303,22 +310,22 @@ logger.setLevel(logging.INFO)
 num_epochs = 40
 batch_size = 80
 beta = 0.00
-drop_prob = 0.0
+drop_prob = 0.2
 layer_sizes = [180, 240, 270, 360, 480, 540]
 for united in layer_sizes:
     for h in layer_sizes:
-        hidden_unsw = [160, united]
-        hidden_nsl = [160, united]
-        EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
-                                                   batch_size, 0.2, beta)
-        EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
-                                                  batch_size, 0.2, beta)
+        hidden_unsw = [256, united]
+        hidden_nsl = [256, united]
         hidden_master = [united, h]
         logger.info('Network Config: %s %s %s' % (hidden_unsw,
                                                   hidden_nsl, hidden_master))
+        EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
+                                                   batch_size, drop_prob, beta)
+        EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
+                                                  batch_size, drop_prob, beta)
         train_with_single(hidden_master, EX1, y1,
-                          [EXT1, EXT2], [test_y1, test_y2], 'UNSW')
+                          [EXT1, EXT2], [test_y1, test_y2], 0, drop_prob)
         train_with_single(hidden_master, EX2, y2,
-                          [EXT1, EXT2], [test_y1, test_y2], 'NSL')
+                          [EXT1, EXT2], [test_y1, test_y2], 1, drop_prob)
         train_with_both(hidden_master, [EX1, EX2], [y1, y2],
-                        [EXT1, EXT2], [test_y1, test_y2])
+                        [EXT1, EXT2], [test_y1, test_y2], drop_prob)
