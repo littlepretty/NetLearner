@@ -263,6 +263,7 @@ def master_model(hidden, drop_prob=0.2, reg_beta=0.001):
 
 
 def train_with_single(hidden, EX, y, EXTs, test_ys, idx, drop_prob,
+                      num_epochs, batch_size,
                       names=['UNSW', 'NSL']):
     model = master_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
     csv_logger = CSVLogger('ModalityNets/master_%s.history' % names[idx],
@@ -273,14 +274,15 @@ def train_with_single(hidden, EX, y, EXTs, test_ys, idx, drop_prob,
                         validation_data=(EXTs[idx], test_ys[idx]))
     for (i, EXT) in enumerate(EXTs):
         score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
-        logger.debug('Master model trained with %s dataset %s test loss\t%.6f' %
+        logger.debug('Master trained with %s dataset %s test loss\t%.6f' %
                      (names[idx], names[i], score[0]))
-        logger.info('Master model trained with %s dataset %s test accu\t%.6f' %
+        logger.info('Master trained with %s dataset %s test accu\t%.6f' %
                     (names[idx], names[i], score[1]))
     return history
 
 
 def train_with_both(hidden, EXs, ys, EXTs, test_ys, drop_prob,
+                    num_epochs, batch_size,
                     names=['UNSW', 'NSL']):
     EX = np.concatenate(EXs, axis=0)
     Ey = np.concatenate(ys, axis=0)
@@ -291,41 +293,52 @@ def train_with_both(hidden, EXs, ys, EXTs, test_ys, drop_prob,
                         steps_per_epoch=None, callbacks=[csv_logger])
     for (i, EXT) in enumerate(EXTs):
         score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
-        logger.debug('Master with BOTH dataset %s test loss\t%.6f' %
+        logger.debug('Master trained with BOTH dataset %s test loss\t%.6f' %
                      (names[i], score[0]))
-        logger.info('Master with BOTH dataset %s test accu\t%.6f' %
+        logger.info('Master trained with BOTH dataset %s test accu\t%.6f' %
                     (names[i], score[1]))
 
     return history
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('modality_nets')
-hdlr = logging.FileHandler('ModalityNets/accuracy.log')
-formatter = logging.Formatter('%(asctime)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
-logger.setLevel(logging.INFO)
+def run_master(united, h):
+    num_epochs = 40
+    batch_size = 80
+    beta = 0.00
+    drop_prob = 0.2
+    hidden_unsw = [256, united]
+    hidden_nsl = [256, united]
+    hidden_master = [united, h]
+    logger.info('Network Config: %s %s %s' % (hidden_unsw,
+                                              hidden_nsl, hidden_master))
+    EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
+                                               batch_size, drop_prob, beta)
+    EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
+                                              batch_size, drop_prob, beta)
+    train_with_single(hidden_master, EX1, y1,
+                      [EXT1, EXT2], [test_y1, test_y2], 0, drop_prob,
+                      num_epochs, batch_size)
+    train_with_single(hidden_master, EX2, y2,
+                      [EXT1, EXT2], [test_y1, test_y2], 1, drop_prob,
+                      num_epochs, batch_size)
+    train_with_both(hidden_master, [EX1, EX2], [y1, y2],
+                    [EXT1, EXT2], [test_y1, test_y2], drop_prob,
+                    num_epochs, batch_size)
 
-num_epochs = 40
-batch_size = 80
-beta = 0.00
-drop_prob = 0.2
-layer_sizes = [180, 240, 270, 360, 480, 540]
-for united in layer_sizes:
-    for h in layer_sizes:
-        hidden_unsw = [256, united]
-        hidden_nsl = [256, united]
-        hidden_master = [united, h]
-        logger.info('Network Config: %s %s %s' % (hidden_unsw,
-                                                  hidden_nsl, hidden_master))
-        EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
-                                                   batch_size, drop_prob, beta)
-        EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
-                                                  batch_size, drop_prob, beta)
-        train_with_single(hidden_master, EX1, y1,
-                          [EXT1, EXT2], [test_y1, test_y2], 0, drop_prob)
-        train_with_single(hidden_master, EX2, y2,
-                          [EXT1, EXT2], [test_y1, test_y2], 1, drop_prob)
-        train_with_both(hidden_master, [EX1, EX2], [y1, y2],
-                        [EXT1, EXT2], [test_y1, test_y2], drop_prob)
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('modality_nets')
+    hdlr = logging.FileHandler('ModalityNets/accuracy.log')
+    formatter = logging.Formatter('%(asctime)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
+    logger.setLevel(logging.INFO)
+
+    # layer_sizes = [180, 240, 270, 360, 480, 540]
+    layer_sizes = [480]
+    num_runs = 1
+    for _ in range(num_runs):
+        for united in layer_sizes:
+            for h in layer_sizes:
+                run_master(united, h)
