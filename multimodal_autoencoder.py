@@ -185,8 +185,7 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
     return EX, EX_test, y, test_y
 
 
-def modality_net_nsl(hidden, num_epochs, batch_size,
-                     drop_prob=0.2, reg_beta=0.001):
+def process_nsl():
     dataset_names = ['NSLKDD/KDD%s.csv' % x for x in ['Train', 'Test']]
     feature_file = 'NSLKDD/feature_names.csv'
     headers, _, _, _ = nslkdd.get_feature_names(feature_file)
@@ -195,53 +194,28 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
     continuous_features = nslkdd.discovery_continuous_map(feature_file,
                                                           dataset_names)
     X, y = get_dataset(dataset_names[0], headers, 'nsl')
-    test_X, test_y = get_dataset(dataset_names[1], headers, 'nsl')
+    X_test, y_test = get_dataset(dataset_names[1], headers, 'nsl')
 
     train_dict = dict()
     test_dict = dict()
-    merged_inputs = []
+    raw_inputs = []
     embeddings = []
     large_discrete = []
-    united = hidden[-1]
     merged_dim = 0
     merged_dim += build_embeddings(symbolic_features, integer_features,
-                                   embeddings, large_discrete, merged_inputs,
-                                   X, test_X, train_dict, test_dict, 'nsl')
-    merged_dim += len(continuous_features)
+                                   embeddings, large_discrete, raw_inputs,
+                                   X, X_test, train_dict, test_dict, 'nsl')
     cont_component = build_continuous(continuous_features,
-                                      merged_inputs, X, test_X,
+                                      raw_inputs, X, X_test,
                                       train_dict, test_dict, 'nsl')
+    merged_dim += len(continuous_features)
     logger.debug('merge input_dim for NSLKDD dataset = %s' % merged_dim)
-
-    merge = concatenate(embeddings + large_discrete + [cont_component],
-                        name='concate_features_nsl')
-    h1 = Dense(hidden[0], activation='relu', name='hidden_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(merge)
-    dropout = Dropout(drop_prob)(h1)
-    bn = BatchNormalization(name='bn_nsl_1')(dropout)
-    h2 = Dense(united, activation='sigmoid', name='unified_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    sm = Dense(2, activation='softmax', name='output')(h2)
-
-    model = Model(inputs=merged_inputs, outputs=sm)
-    model.compile(optimizer='adam', loss='binary_crossentropy',
-                  metrics=['accuracy'])
-    model.summary()
-    csv_logger = CSVLogger('ModalityNets/mn_NSL.history', append=True)
-    history = model.fit(train_dict, {'output': y}, shuffle=True,
-                        epochs=num_epochs, batch_size=batch_size,
-                        callbacks=[csv_logger],
-                        validation_data=(test_dict, test_y))
-    logger.debug(history)
-    score = model.evaluate(test_dict, test_y, test_y.shape[0], verbose=1)
-    logger.debug('ModalityNet NSL test loss\t%.6f' % score[0])
-    logger.info('ModalityNet NSL test accu\t%.6f' % score[1])
-
-    EX, EX_test = get_intermediate_output(model, 'unified_nsl', merged_inputs,
-                                          train_dict, test_dict)
-    # model.save('ModalityNets/NSL.h5')
-    # np.savez('ModalityNets/nsl_EX.npy', train=EX, test=EX_test)
-    return EX, EX_test, y, test_y
+    merged_nsl = concatenate(embeddings + large_discrete + [cont_component],
+                             name='concate_features_nsl')
+    results = {'nsl': merged_nsl, 'nsl_dim': merged_dim,
+               'raw_inputs': raw_inputs, 'X': X, 'y': y,
+               'X_test': X_test, 'y_test': y_test}
+    return results
 
 
 def multimodal_autoencoder(U1, U2):
