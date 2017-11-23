@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers.core import Dense, Flatten, Dropout, Input
+from keras.layers import Dense, Flatten, Dropout, Input
 from keras.layers.embeddings import Embedding
 
 from preprocess.unsw import get_feature_names, discovery_feature_volcabulary
@@ -25,21 +25,38 @@ def get_dataset(dataset_name, headers):
 def embedding_feature(X, y, X_test, y_test, name):
     vocabulary_dim = int(max(np.amax(X), np.amax(X_test)) + 1)
     embedding_dim = int(np.ceil(np.log2(vocabulary_dim)))
-    embedding_dim = max(4, embedding_dim)
+    embedding_dim = min(4, embedding_dim)
 
     print("|V| =", vocabulary_dim)
     print("|E| =", embedding_dim)
     print("X.shape =", X.shape)
-    feature = Input(shape=X.shape, name='feature_%s' % name)
+    feature = Input(shape=(1, ), name='feature_%s' % name)
     embedding = Embedding(vocabulary_dim, embedding_dim,
                           input_length=1)(feature)
     flatten = Flatten()(embedding)
     sm = Dense(2, activation='softmax', name='output')(flatten)
     model = Model(inputs=feature, outputs=sm)
-    model.add(Flatten())
-    model.compile(optimizer='rmsprop', loss='binary_crossentropy',
+    model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
-    model.fit(X, y, epochs=10, batch_size=200)
+    model.summary()
+    model.fit(X, y, epochs=8, batch_size=100, shuffle=True)
+    scores = model.evaluate(X_test, y_test, batch_size=X_test.shape[0])
+    print(scores)
+
+
+def min_max_feature(X, y, X_test, y_test, name):
+    mm = MinMaxScaler()
+    mm.fit(np.concatenate((X, X_test), axis=0))
+    X = mm.transform(X)
+    X_test = mm.transform(X_test)
+
+    feature = Input(shape=(X.shape[1], ),  name='feature_%s' % name)
+    sm = Dense(2, activation='softmax', name='output')(feature)
+    model = Model(inputs=feature, outputs=sm)
+    model.compile(optimizer='adam', loss='binary_crossentropy',
+                  metrics=['accuracy'])
+    model.summary()
+    model.fit(X, y, epochs=8, batch_size=100, shuffle=True)
     scores = model.evaluate(X_test, y_test, batch_size=X_test.shape[0])
     print(scores)
 
@@ -60,7 +77,9 @@ for (name, values) in symbolic_features.items():
     raw_X_test = test_X[name].as_matrix()
     le = LabelEncoder()
     le.fit(np.concatenate((raw_X, raw_X_test), axis=0))
-    feature = le.transform(raw_X)
-    feature_test = le.transform(raw_X_test)
-    print(feature.shape, feature_test.shape)
+    temp = le.transform(raw_X)
+    temp_test = le.transform(raw_X_test)
+    feature = np.reshape(temp, (temp.shape[0], 1))
+    feature_test = np.reshape(temp_test, (temp_test.shape[0], 1))
+    min_max_feature(feature, y, feature_test, test_y, name)
     # embedding_feature(feature, y, feature_test, test_y, name)

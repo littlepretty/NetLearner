@@ -337,7 +337,7 @@ if __name__ == '__main__':
 
     # layer_sizes = [180, 240, 270, 360, 480, 540]
     layer_sizes = [480]
-    num_runs = 1
+    num_runs = 10
     for _ in range(num_runs):
         for united in layer_sizes:
             for h in layer_sizes:
