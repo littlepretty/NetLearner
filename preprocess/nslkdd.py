@@ -137,12 +137,10 @@ label_names = ['normal', 'probe', 'dos', 'u2r', 'r2l']
 category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
 enc = OneHotEncoder()
-encoder_fitted = False
 
 
-def load_traffic(filename, traffic_map=category_map, show=6):
+def load_traffic(filename, encoder_fitted, traffic_map=category_map, show=6):
     """Each row  of all_traffic is a traffic record"""
-    global encoder_fitted
     numerical_features = list()
     symbolic_features = list()
     labels = list()
@@ -188,9 +186,8 @@ def load_traffic(filename, traffic_map=category_map, show=6):
 
     if encoder_fitted is False:
         enc.fit(symbolic_features)
-        encoder_fitted = True
-    print('Numeric feature size: ', part1.shape[1])
 
+    print('Numeric feature size: ', part1.shape[1])
     encoded = enc.transform(symbolic_features).toarray()
     print('One-Hot Encoded symbolic features: ', encoded.shape)
     part2 = np.array(encoded, dtype=float)
@@ -249,8 +246,6 @@ def split_dataset_with_label(matrix):
 
 
 def maybe_npsave(dataname, data, force=True):
-    if binary_label:
-        dataname = dataname + '_bin'
     filename = dataname + '.npy'
     if os.path.exists(filename) and not force:
         print('%s already exists - Skip saving.' % filename)
@@ -263,7 +258,7 @@ def maybe_npsave(dataname, data, force=True):
 
 def generate_train_dataset(dataset, labels, size=''):
     maybe_npsave('NSLKDD/train_dataset' + size, dataset)
-    maybe_npsave('NSLKDD/train_ref' + size, labels)
+    maybe_npsave('NSLKDD/train_labels' + size, labels)
 
     print('Training', dataset.shape, labels.shape)
 
@@ -288,35 +283,35 @@ def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, size=''):
 
     print('Test dataset ', dataset.shape, labels.shape)
     maybe_npsave('NSLKDD/test_dataset' + size, dataset)
-    maybe_npsave('NSLKDD/test_ref' + size, labels)
+    maybe_npsave('NSLKDD/test_labels' + size, labels)
 
     print('Valid dataset ', valid_dataset.shape, valid_label.shape)
     maybe_npsave('NSLKDD/valid_dataset' + size, valid_dataset)
-    maybe_npsave('NSLKDD/valid_ref' + size, valid_label)
+    maybe_npsave('NSLKDD/valid_labels' + size, valid_label)
 
 
-def generate_datasets():
+def generate_datasets(binary_label):
     global num_classes
-    train = 'NSLKDD/KDDTrain+.txt'
+    train = 'NSLKDD/KDDTrain.csv'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix, dist = load_traffic(train, binary_map)
+        data_matrix, dist = load_traffic(train, False, binary_map)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(train)
+        data_matrix, dist = load_traffic(train, False)
 
     dataset, labels = shuffle_dataset_with_label(data_matrix)
     generate_train_dataset(dataset, labels)
 
-    test = 'NSLKDD/KDDTest+.txt'
+    test = 'NSLKDD/KDDTest.csv'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix, dist = load_traffic(test, binary_map)
+        data_matrix, dist = load_traffic(test, True, binary_map)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(test)
+        data_matrix, dist = load_traffic(test, True)
 
     dataset, labels = split_dataset_with_label(data_matrix)
     generate_valid_test_dataset(dataset, labels, dist)
@@ -417,6 +412,5 @@ def discovery_feature_volcabulary(filenames, verbose=True):
 if __name__ == '__main__':
     np.set_printoptions(precision=4)
     binary_label = False
-    generate_datasets()
-    # binary_label = True
+    generate_datasets(binary_label)
     # generate_datasets()
