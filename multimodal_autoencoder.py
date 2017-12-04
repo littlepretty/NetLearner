@@ -1,9 +1,10 @@
 from keras.models import Model
-from keras.layers import Dense, Input, Dropout
+from keras.layers import Dense, Input
+# from keras.layers import Dropout
 from keras import regularizers
 from keras.layers import BatchNormalization
 from keras.callbacks import CSVLogger
-from keras import initializers
+# from keras import initializers
 
 import tensorflow as tf
 from keras.backend import tensorflow_backend as K
@@ -141,9 +142,9 @@ def train_single_encoder(X, X_test, H1, U, num_epochs, batch_size, name):
 def train_linear_model(X, y, X_test, y_test, num_epochs, batch_size, beta):
     feature_dim = X.shape[1]
     classifier = linear_model(feature_dim, beta)
-    classifier.fit(X, y, batch_size=batch_size, epochs=num_epochs)
+    classifier.fit(X, y, batch_size=batch_size, epochs=10)  # fixed for LM
     scores = classifier.evaluate(X_test, y_test, batch_size=X_test.shape[0])
-    return scores
+    return scores, classifier
 
 
 def supervised_single(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
@@ -167,31 +168,28 @@ def supervised_single(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
     EX_concat = np.concatenate((EX_unsw, EX_nsl), axis=0)
     y_concat = np.concatenate((y_unsw, y_nsl), axis=0)
     print(EX_concat.shape, y_concat.shape)
-    scores6U = train_linear_model(EX_concat, y_concat,
-                                  EX_unsw_test, y_unsw_test,
-                                  num_epochs, batch_size, beta)
+    scores6U, lm = train_linear_model(EX_concat, y_concat,
+                                      EX_unsw_test, y_unsw_test,
+                                      num_epochs, batch_size, beta)
     logger.info('Trained on concat unshared-encoding, UNSW accu6\t%.6f'
                 % scores6U[1])
-    scores6N = train_linear_model(EX_concat, y_concat,
-                                  EX_nsl_test, y_nsl_test,
-                                  num_epochs, batch_size, beta)
+    scores6N = lm.evaluate(EX_nsl_test, y_nsl_test,
+                           batch_size=EX_nsl_test.shape[0])
     logger.info('Trained on concat unshared-encoding, NSL accu6\t%.6f'
                 % scores6N[1])
     # Get accu3
     EX_unsw, EX_unsw_test = train_single_encoder(X_unsw, X_unsw_test,
                                                  H1, U, num_epochs,
                                                  batch_size, 'unsw')
-    scores3 = train_linear_model(EX_unsw, y_unsw,
-                                 EX_unsw_test, y_unsw_test,
-                                 num_epochs, batch_size, beta)
+    scores3, _ = train_linear_model(EX_unsw, y_unsw, EX_unsw_test, y_unsw_test,
+                                    num_epochs, batch_size, beta)
     logger.info('Trained on single UNSW-encoding, accu3\t%.6f' % scores3[1])
     # Get accu1
     EX_nsl, EX_nsl_test = train_single_encoder(X_nsl, X_nsl_test,
                                                H1, U, num_epochs,
                                                batch_size, 'nsl')
-    scores1 = train_linear_model(EX_nsl, y_nsl,
-                                 EX_nsl_test, y_nsl_test,
-                                 num_epochs, batch_size, beta)
+    scores1, _ = train_linear_model(EX_nsl, y_nsl, EX_nsl_test, y_nsl_test,
+                                    num_epochs, batch_size, beta)
     logger.info('Trained on single NSL-encoding, accu1\t%.6f' % scores1[1])
     return {'accu1': scores1[1], 'accu3': scores3[1],
             'accu6(UNSL)': scores6U[1], 'accu6(NSL)': scores6N[1]}
@@ -213,7 +211,7 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
 
     model_unsw, model_nsl, encoder_unsw, encoder_nsl = multimodal_autoencoder(
         unsw_dim, nsl_dim, H1, U)
-    for _ in range(num_epochs):
+    for _ in range(num_epochs * 2):
         model_unsw.fit(X_unsw, X_unsw, epochs=2, batch_size=batch_size)
         model_nsl.fit(X_nsl, X_nsl, epochs=2, batch_size=batch_size)
 
@@ -227,34 +225,32 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
     # Get accu5(unsw) and accu5(nsl)
     EX_concat = np.concatenate((EX_unsw, EX_nsl), axis=0)
     y_concat = np.concatenate((y_unsw, y_nsl), axis=0)
-    scores5U = train_linear_model(EX_concat, y_concat,
-                                  EX_unsw_test, y_unsw_test,
-                                  num_epochs, batch_size, beta)
+    scores5U, lm = train_linear_model(EX_concat, y_concat,
+                                      EX_unsw_test, y_unsw_test,
+                                      num_epochs, batch_size, beta)
     logger.info('Trained on concat shared-encoding, UNSW accu5\t%.6f'
                 % scores5U[1])
-    scores5N = train_linear_model(EX_concat, y_concat,
-                                  EX_nsl_test, y_nsl_test,
-                                  num_epochs, batch_size, beta)
+    scores5N = lm.evaluate(EX_nsl_test, y_nsl_test,
+                           batch_size=EX_nsl_test.shape[0])
     logger.info('Trained on concat shared-encoding, NSL accu5\t%.6f'
                 % scores5N[1])
     # Get accu4
-    scores4 = train_linear_model(EX_unsw, y_unsw,
-                                 EX_unsw_test, y_unsw_test,
-                                 num_epochs, batch_size, beta)
+    scores4, _ = train_linear_model(EX_unsw, y_unsw, EX_unsw_test, y_unsw_test,
+                                    num_epochs, batch_size, beta)
     logger.info('Trained on shared UNSW-encoding, accu4\t%.6f' % scores4[1])
     # Get accu2
-    scores2 = train_linear_model(EX_nsl, y_nsl,
-                                 EX_nsl_test, y_nsl_test,
-                                 num_epochs, batch_size, beta)
+    scores2, _ = train_linear_model(EX_nsl, y_nsl, EX_nsl_test, y_nsl_test,
+                                    num_epochs, batch_size, beta)
     logger.info('Trained on shared NSL-encoding, accu2\t%.6f' % scores2[1])
     return {'accu2': scores2[1], 'accu4': scores4[1],
             'accu5(UNSL)': scores5U[1], 'accu5(NSL)': scores5N[1]}
 
 
 def run_master(unsw_dict, nsl_dict, H1, U):
-    num_epochs = 40
-    batch_size = 120
+    num_epochs = 20
+    batch_size = 64
     beta = 0.01
+    multicore_session()
     logger.info('Network config: %s %s %s %s for %d train epochs and %d batch'
                 % (H1, U, U, H1, num_epochs, batch_size))
     supervised_single(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta)
@@ -273,11 +269,15 @@ if __name__ == '__main__':
     unsw_dict = process_unsw()
     nsl_dict = process_nsl()
 
-    multicore_session()
     # layer_sizes = [128, 240, 320, 400]
-    layer_sizes = [320]
+    layer_sizes = [400, 512]
     num_runs = 10
     for H1 in layer_sizes:
-        for _ in range(num_runs):
+        logger.info('********************************************************')
+        logger.info('**** Start %d runs with various layer config %d *******'
+                    % (num_runs, H1))
+        logger.info('********************************************************')
+        for i in range(num_runs):
+            logger.info('*** Run index %d ***' % i)
             run_master(unsw_dict, nsl_dict, H1, H1 * 2)
             tf.reset_default_graph()
