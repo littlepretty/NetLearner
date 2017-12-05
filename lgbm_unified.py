@@ -127,13 +127,20 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
                            , min_child_weight=6
                            )
 
-    print "Fitting lgbm model for unsw"
     model.fit(EX_concat, y_concat)
     # pred = model.predict(test_dataset)
+    logger.info("Training lgbm model on unified representation")
+    
     print("Shared model UNSW train acc:", model.score(EX_unsw, y_unsw))
     print("Shared model UNSW test acc:", model.score(EX_unsw_test, y_unsw_test))
     print("Shared model NSL train acc:", model.score(EX_nsl, y_nsl))
     print("Shared model NSL test acc:", model.score(EX_nsl_test, y_nsl_test))
+
+    logger.info("Shared model UNSW train acc:", model.score(EX_unsw, y_unsw))
+    logger.info("Shared model UNSW test acc:", model.score(EX_unsw_test, y_unsw_test))
+    logger.info("Shared model NSL train acc:", model.score(EX_nsl, y_nsl))
+    logger.info("Shared model NSL test acc:", model.score(EX_nsl_test, y_nsl_test))
+    
 
 
 def run_master(unsw_dict, nsl_dict, H1, U):
