@@ -6,7 +6,6 @@ import os
 import sys
 import numpy as np
 import pandas
-import logging
 from sklearn.preprocessing import OneHotEncoder
 # import argparse
 
@@ -136,10 +135,10 @@ attack_category_map = {'normal': 'normal', 'back': 'dos',
 label_names = ['normal', 'probe', 'dos', 'u2r', 'r2l']
 category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
-enc = OneHotEncoder()
 
 
-def load_traffic(filename, encoder_fitted, traffic_map=category_map, show=6):
+def load_traffic(filename, encoder_fitted, traffic_map=category_map,
+                 one_hot_encode=True, show=6):
     """Each row  of all_traffic is a traffic record"""
     numerical_features = list()
     symbolic_features = list()
@@ -183,20 +182,23 @@ def load_traffic(filename, encoder_fitted, traffic_map=category_map, show=6):
                 print('Cannot parse %s at line %d' % (e, exc_tb.tb_lineno))
 
     part1 = np.array(numerical_features, dtype=float)
-
-    if encoder_fitted is False:
-        enc.fit(symbolic_features)
-
     print('Numeric feature size: ', part1.shape[1])
-    encoded = enc.transform(symbolic_features).toarray()
-    print('One-Hot Encoded symbolic features: ', encoded.shape)
-    part2 = np.array(encoded, dtype=float)
-    print('Symbolic feature sizes: ', enc.n_values_, part2.shape)
+
+    if one_hot_encoding is True:
+        if encoder_fitted is False:
+            enc = OneHotEncoder()
+            enc.fit(symbolic_features)
+
+        encoded = enc.transform(symbolic_features).toarray()
+        print('One-Hot Encoded symbolic features: ', encoded.shape)
+        part2 = np.array(encoded, dtype=float)
+        print('Symbolic feature sizes: ', enc.n_values_, part2.shape)
+    else:
+        part2 = np.array(symbolic_features, dtype=float)
+        print('Symbolic feature sizes: ', part2.shape)
 
     all_traffics = np.concatenate((part1, part2), axis=1)
-
     labels = np.array(labels, dtype=int)[np.newaxis]
-
     dist = []
     for (i, name) in enumerate(label_names):
         print('#%s = %d' % (name,  np.sum(labels == i)))
@@ -290,16 +292,17 @@ def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, size=''):
     maybe_npsave('NSLKDD/valid_labels' + size, valid_label)
 
 
-def generate_datasets(binary_label):
+def generate_datasets(binary_label, one_hot_encoding=False):
     global num_classes
     train = 'NSLKDD/KDDTrain.csv'
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix, dist = load_traffic(train, False, binary_map)
+        data_matrix, dist = load_traffic(train, False,
+                                         binary_map, one_hot_encoding)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(train, False)
+        data_matrix, dist = load_traffic(train, False, one_hot_encoding)
 
     dataset, labels = shuffle_dataset_with_label(data_matrix)
     generate_train_dataset(dataset, labels)
@@ -308,10 +311,11 @@ def generate_datasets(binary_label):
     if binary_label:
         print('Use binary label')
         num_classes = 2
-        data_matrix, dist = load_traffic(test, True, binary_map)
+        data_matrix, dist = load_traffic(test, True,
+                                         binary_map, one_hot_encoding)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(test, True)
+        data_matrix, dist = load_traffic(test, True, one_hot_encoding)
 
     dataset, labels = split_dataset_with_label(data_matrix)
     generate_valid_test_dataset(dataset, labels, dist)

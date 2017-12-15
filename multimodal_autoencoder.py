@@ -71,7 +71,7 @@ def single_encoder(feature_dim, H1, U):
     h4 = Dense(feature_dim, activation='sigmoid', name='h4')(h3)
 
     model = Model(inputs=input_layer, outputs=h4)
-    model.compile(optimizer='adam', loss='binary_crossentropy')
+    model.compile(optimizer='adadelta', loss='binary_crossentropy')
 
     encoder = Model(inputs=input_layer, outputs=encoding)  # or bn2
     return model, encoder
@@ -103,16 +103,20 @@ def multimodal_autoencoder(unsw_dim, nsl_dim, H1, U, sparse=0.00):
     h4_unsw = Dense(unsw_dim, activation='sigmoid', name='h4_unsw')(h3_unsw)
     h4_nsl = Dense(nsl_dim, activation='sigmoid', name='h4_nsl')(h3_nsl)
 
-    model_unsw = Model(inputs=unsw, outputs=h4_unsw)
-    model_unsw.compile(optimizer='adam', loss='binary_crossentropy')
-    model_unsw.summary()
-    model_nsl = Model(inputs=nsl, outputs=h4_nsl)
-    model_nsl.compile(optimizer='adam', loss='binary_crossentropy')
-    model_nsl.summary()
+    shared_model = Model(inputs=[unsw, nsl], outputs=[h4_unsw, h4_nsl])
+    shared_model.compile(optimizer='adadelta', loss='binary_crossentropy')
+    shared_model.summary()
+
+    # model_unsw = Model(inputs=unsw, outputs=h4_unsw)
+    # model_unsw.compile(optimizer='adam', loss='binary_crossentropy')
+    # model_unsw.summary()
+    # model_nsl = Model(inputs=nsl, outputs=h4_nsl)
+    # model_nsl.compile(optimizer='adam', loss='binary_crossentropy')
+    # model_nsl.summary()
     encoder_unsw = Model(inputs=unsw, outputs=shared_unsw)
     encoder_nsl = Model(inputs=nsl, outputs=shared_nsl)
 
-    return model_unsw, model_nsl, encoder_unsw, encoder_nsl
+    return shared_model, encoder_unsw, encoder_nsl
 
 
 def linear_model(feature_dim, reg_beta=0.00):
@@ -141,7 +145,7 @@ def train_single_encoder(X, X_test, H1, U, num_epochs, batch_size, name):
 def train_linear_model(X, y, X_test, y_test, num_epochs, batch_size, beta):
     feature_dim = X.shape[1]
     classifier = linear_model(feature_dim, beta)
-    classifier.fit(X, y, batch_size=batch_size, epochs=8, verbose=1)
+    classifier.fit(X, y, batch_size=batch_size, epochs=num_epochs, verbose=1)
     scores = classifier.evaluate(X_test, y_test, batch_size=X_test.shape[0])
     return scores, classifier
 
@@ -202,13 +206,16 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
     unsw_dim = X_unsw.shape[1]
     nsl_dim = X_nsl.shape[1]
 
-    model_unsw, model_nsl, encoder_unsw, encoder_nsl = multimodal_autoencoder(
+    shared_model, encoder_unsw, encoder_nsl = multimodal_autoencoder(
         unsw_dim, nsl_dim, H1, U)
-    for _ in range(num_epochs):
-        model_unsw.fit(X_unsw, X_unsw, epochs=2,
-                       batch_size=batch_size, verbose=1)
-        model_nsl.fit(X_nsl, X_nsl, epochs=2,
-                      batch_size=batch_size, verbose=1)
+
+    dummy_unsw = np.zeros(shape=(X_unsw.shape[0], X_nsl.shape[1]))
+    dummy_nsl = np.zeros(shape=(X_nsl.shape[0], X_unsw.shape[1]))
+
+    padded_unsw = np.concatenate((X_unsw, dummy_nsl), axis=0)
+    padded_nsl = np.concatenate((dummy_unsw, X_nsl), axis=0)
+    shared_model.fit([padded_unsw, padded_nsl], [padded_unsw, padded_nsl],
+                     epochs=num_epochs, batch_size=batch_size, verbose=1)
 
     # Get the shared representation of both datasets
     EX_unsw = encoder_unsw.predict(X_unsw)
@@ -242,7 +249,7 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
 
 
 def run_master(unsw_dict, nsl_dict, H1, U):
-    num_epochs = 6
+    num_epochs = 10
     batch_size = 64
     beta = 0.01
     multicore_session()
