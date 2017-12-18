@@ -233,7 +233,7 @@ def split_valid(dataset, labels, percent=0.12):
     return valid_dataset, valid_labels
 
 
-def generate_dataset(one_hot_encode=True):
+def generate_dataset(one_hot_encode=True, root_dir=''):
     prefix = 'UNSW/UNSW_NB15_'
     train_name = prefix + 'training-set.csv'
     test_name = prefix + 'testing-set.csv'
@@ -252,17 +252,20 @@ def generate_dataset(one_hot_encode=True):
     test_traffic = np.concatenate((num_test, sym_test), axis=1)
 
     print('Trainset shape:', train_traffic.shape, train_labels.shape)
-    maybe_npsave('UNSW/train_dataset', train_traffic)
-    maybe_npsave('UNSW/train_labels', train_labels, binary_label=True)
+    maybe_npsave('%sUNSW/train_dataset' % root_dir, train_traffic)
+    maybe_npsave('%sUNSW/train_labels' % root_dir, train_labels,
+                 binary_label=True)
 
     valid_traffic, valid_labels = split_valid(test_traffic, test_labels)
     print('Validset shape:', valid_traffic.shape, valid_labels.shape)
-    maybe_npsave('UNSW/valid_dataset', valid_traffic)
-    maybe_npsave('UNSW/valid_labels', valid_labels, binary_label=True)
+    maybe_npsave('%sUNSW/valid_dataset' % root_dir, valid_traffic)
+    maybe_npsave('%sUNSW/valid_labels' % root_dir, valid_labels,
+                 binary_label=True)
 
     print('Testset shape:', test_traffic.shape, test_labels.shape)
-    maybe_npsave('UNSW/test_dataset', test_traffic)
-    maybe_npsave('UNSW/test_labels', test_labels, binary_label=True)
+    maybe_npsave('%sUNSW/test_dataset' % root_dir, test_traffic)
+    maybe_npsave('%sUNSW/test_labels' % root_dir, test_labels,
+                 binary_label=True)
 
 
 if __name__ == '__main__':
