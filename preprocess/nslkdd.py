@@ -258,14 +258,14 @@ def maybe_npsave(dataname, data, force=True):
     return filename
 
 
-def generate_train_dataset(dataset, labels, size=''):
-    maybe_npsave('NSLKDD/train_dataset' + size, dataset)
-    maybe_npsave('NSLKDD/train_labels' + size, labels)
+def generate_train_dataset(dataset, labels, root=''):
+    maybe_npsave(root + 'NSLKDD/train_dataset', dataset)
+    maybe_npsave(root + 'NSLKDD/train_labels', labels)
 
     print('Training', dataset.shape, labels.shape)
 
 
-def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, size=''):
+def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, root=''):
     print('Original Test dataset ', dataset.shape, labels.shape)
     valid_dataset = np.ndarray(shape=(0, dataset.shape[1]))
     valid_label = np.ndarray(shape=(0, labels.shape[1]))
@@ -284,15 +284,15 @@ def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, size=''):
                                      axis=0)
 
     print('Test dataset ', dataset.shape, labels.shape)
-    maybe_npsave('NSLKDD/test_dataset' + size, dataset)
-    maybe_npsave('NSLKDD/test_labels' + size, labels)
+    maybe_npsave(root + 'NSLKDD/test_dataset', dataset)
+    maybe_npsave(root + 'NSLKDD/test_labels', labels)
 
     print('Valid dataset ', valid_dataset.shape, valid_label.shape)
-    maybe_npsave('NSLKDD/valid_dataset' + size, valid_dataset)
-    maybe_npsave('NSLKDD/valid_labels' + size, valid_label)
+    maybe_npsave(root + 'NSLKDD/valid_dataset', valid_dataset)
+    maybe_npsave(root + 'NSLKDD/valid_labels', valid_label)
 
 
-def generate_datasets(binary_label, one_hot_encoding=False):
+def generate_datasets(binary_label, one_hot_encoding=False, root=''):
     global num_classes
     train = 'NSLKDD/KDDTrain.csv'
     if binary_label:
@@ -305,7 +305,7 @@ def generate_datasets(binary_label, one_hot_encoding=False):
         data_matrix, dist = load_traffic(train, False, one_hot_encoding)
 
     dataset, labels = shuffle_dataset_with_label(data_matrix)
-    generate_train_dataset(dataset, labels)
+    generate_train_dataset(dataset, labels, root)
 
     test = 'NSLKDD/KDDTest.csv'
     if binary_label:
@@ -318,7 +318,7 @@ def generate_datasets(binary_label, one_hot_encoding=False):
         data_matrix, dist = load_traffic(test, True, one_hot_encoding)
 
     dataset, labels = split_dataset_with_label(data_matrix)
-    generate_valid_test_dataset(dataset, labels, dist)
+    generate_valid_test_dataset(dataset, labels, dist, root=root)
 
 
 def get_feature_names(feature_file):
