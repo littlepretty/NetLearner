@@ -107,10 +107,18 @@ def multimodal_autoencoder(unsw_dim, nsl_dim, H1, U, sparse=0.00):
     shared_model.compile(optimizer='adadelta', loss='binary_crossentropy')
     shared_model.summary()
 
+    model_unsw = Model(inputs=unsw, output=h4_unsw)
+    model_unsw.compile(optimizer='adadelta', loss='binary_crossentropy')
+    model_unsw.summary()
+
+    model_nsl = Model(inputs=nsl, output=h4_nsl)
+    model_nsl.compile(optimizer='adadelta', loss='binary_crossentropy')
+    model_nsl.summary()
+
     encoder_unsw = Model(inputs=unsw, outputs=shared_unsw)
     encoder_nsl = Model(inputs=nsl, outputs=shared_nsl)
 
-    return shared_model, encoder_unsw, encoder_nsl
+    return model_unsw, model_nsl, encoder_unsw, encoder_nsl
 
 
 def linear_model(feature_dim, reg_beta=0.00):
@@ -197,20 +205,27 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
     X_nsl_test = nsl_dict['X_test']
     y_nsl = nsl_dict['y']
     y_nsl_test = nsl_dict['y_test']
-    unsw_dim = X_unsw.shape[1]
-    nsl_dim = X_nsl.shape[1]
+    (unsw_size, unsw_dim) = X_unsw.shape
+    (nsl_size, nsl_dim) = X_nsl.shape
 
-    shared_model, encoder_unsw, encoder_nsl = multimodal_autoencoder(
+    unsw_model, nsl_model, encoder_unsw, encoder_nsl = multimodal_autoencoder(
         unsw_dim, nsl_dim, H1, U)
+    encoder_loss = [[], []]
+    for _ in range(num_epochs):
+        unsw_model.fit(X_unsw, X_unsw, epochs=1, batch_size=batch_size)
+        encoder_loss[0].append(
+            unsw_model.evaluate(X_unsw, X_unsw, batch_size=unsw_size, verbose=0))
+        encoder_loss[1].append(
+            nsl_model.evaluate(X_nsl, X_nsl, batch_size=nsl_size, verbose=0))
 
-    dummy_unsw = np.zeros(shape=(X_unsw.shape[0], X_nsl.shape[1]))
-    dummy_nsl = np.zeros(shape=(X_nsl.shape[0], X_unsw.shape[1]))
+        nsl_model.fit(X_nsl, X_nsl, epochs=1, batch_size=batch_size)
+        encoder_loss[0].append(
+            unsw_model.evaluate(X_unsw, X_unsw, batch_size=unsw_size, verbose=0))
+        encoder_loss[1].append(
+            nsl_model.evaluate(X_nsl, X_nsl, batch_size=nsl_size, verbose=0))
 
-    padded_unsw = np.concatenate((X_unsw, dummy_nsl), axis=0)
-    padded_nsl = np.concatenate((dummy_unsw, X_nsl), axis=0)
-    shared_model.fit([padded_unsw, padded_nsl], [padded_unsw, padded_nsl],
-                     epochs=num_epochs, batch_size=batch_size)
-
+    print(encoder_loss[0])
+    print(encoder_loss[1])
     # Get the shared representation of both datasets
     EX_unsw = encoder_unsw.predict(X_unsw)
     EX_unsw_test = encoder_unsw.predict(X_unsw_test)
@@ -243,14 +258,15 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
 
 
 def run_master(unsw_dict, nsl_dict, H1, U):
-    num_epochs = 20
+    num_epochs = 4
     batch_size = 128
     beta = 0.01
     multicore_session()
     logger.info('Network config: %s %s %s %s for %d train epochs and %d batch'
                 % (H1, U, U, H1, num_epochs, batch_size))
-    part1 = supervised_single(unsw_dict, nsl_dict, H1, U,
-                              num_epochs, batch_size, beta)
+    part1 = dict()
+    # part1 = supervised_single(unsw_dict, nsl_dict, H1, U,
+                              # num_epochs, batch_size, beta)
     part2 = supervised_shared(unsw_dict, nsl_dict, H1, U,
                               num_epochs, batch_size, beta)
     return dict(part1, **part2)
@@ -270,8 +286,8 @@ if __name__ == '__main__':
     nsl_dict = process_nsl(root_dir)
 
     # layer_sizes = [128, 240, 320, 400]
-    layer_sizes = [640, 512, 400]
-    num_runs = 10
+    layer_sizes = [400]
+    num_runs = 1
     mult = 2
     results = []
     for H1 in layer_sizes:
