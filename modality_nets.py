@@ -1,12 +1,12 @@
 from keras.models import Model
 from keras.layers import Dense, Input, concatenate, Flatten, Dropout
-from keras import regularizers
+# from keras import regularizers
 from keras.layers import Embedding, BatchNormalization
 from keras.callbacks import CSVLogger
-
 from preprocess import unsw, nslkdd
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-
+import pprint
+import pickle
 import pandas as pd
 import numpy as np
 import logging
@@ -143,7 +143,6 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
     merged_inputs = []
     embeddings = []
     large_discrete = []
-    united = hidden[-1]
     merged_dim = 0
     merged_dim += build_embeddings(symbolic_features, integer_features,
                                    embeddings, large_discrete, merged_inputs,
@@ -156,27 +155,31 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
 
     merge = concatenate(embeddings + large_discrete + [cont_component],
                         name='concate_features_unsw')
-    h1 = Dense(hidden[0], activation='relu', name='hidden_unsw',
-               kernel_regularizer=regularizers.l2(reg_beta))(merge)
+    h1 = Dense(hidden[0], activation='relu', name='hidden_unsw')(merge)
     dropout = Dropout(drop_prob)(h1)
-    bn = BatchNormalization(name='bn_unsw_1')(dropout)
-    h2 = Dense(united, activation='sigmoid', name='unified_unsw',
-               kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    sm = Dense(2, activation='softmax', name='output')(h2)
+    h2 = Dense(hidden[1], activation='relu', name='unified_unsw')(dropout)
+
+    bn = BatchNormalization(name='bn_unified_unsw')(h2)
+    h3 = Dense(hidden[2], activation='sigmoid', name='sigmoid')(bn)
+    sm = Dense(2, activation='softmax', name='output')(h3)
 
     model = Model(inputs=merged_inputs, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
     model.summary()
-    csv_logger = CSVLogger('ModalityNets/mn_UNSW.history', append=True)
-    history = model.fit(train_dict, {'output': y}, shuffle=True,
-                        epochs=num_epochs, batch_size=batch_size,
-                        callbacks=[csv_logger],
-                        validation_data=(test_dict, test_y))
+    csv_logger = CSVLogger(root + 'modnet_unsw.history', append=True)
+    history = model.fit(train_dict, {'output': y}, batch_size, num_epochs,
+                        callbacks=[csv_logger])
     logger.debug(history)
-    score = model.evaluate(test_dict, test_y, test_y.shape[0], verbose=1)
-    logger.debug('ModalityNet UNSW test loss\t%.6f' % score[0])
-    logger.info('ModalityNet UNSW test accu\t%.6f' % score[1])
+    score = model.evaluate(train_dict, y, y.shape[0])
+    logger.debug('modnet[unsw] train loss\t%.6f' % score[0])
+    logger.info('modenet[unsw] train accu\t%.6f' % score[1])
+    modnet['unsw']['train'].append(score[1])
+
+    score = model.evaluate(test_dict, test_y, test_y.shape[0])
+    logger.debug('modnet[unsw] test loss\t%.6f' % score[0])
+    logger.info('modenet[unsw] test accu\t%.6f' % score[1])
+    modnet['unsw']['test'].append(score[1])
 
     EX, EX_test = get_intermediate_output(model, 'unified_unsw', merged_inputs,
                                           train_dict, test_dict)
@@ -202,7 +205,6 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
     merged_inputs = []
     embeddings = []
     large_discrete = []
-    united = hidden[-1]
     merged_dim = 0
     merged_dim += build_embeddings(symbolic_features, integer_features,
                                    embeddings, large_discrete, merged_inputs,
@@ -215,27 +217,31 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
 
     merge = concatenate(embeddings + large_discrete + [cont_component],
                         name='concate_features_nsl')
-    h1 = Dense(hidden[0], activation='relu', name='hidden_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(merge)
+    h1 = Dense(hidden[0], activation='relu', name='hidden_nsl')(merge)
     dropout = Dropout(drop_prob)(h1)
-    bn = BatchNormalization(name='bn_nsl_1')(dropout)
-    h2 = Dense(united, activation='sigmoid', name='unified_nsl',
-               kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    sm = Dense(2, activation='softmax', name='output')(h2)
+    h2 = Dense(hidden[1], activation='relu', name='unified_nsl')(dropout)
+
+    bn = BatchNormalization(name='bn_unified_nsl')(h2)
+    h3 = Dense(hidden[2], activation='sigmoid', name='sigmoid')(bn)
+    sm = Dense(2, activation='softmax', name='output')(h3)
 
     model = Model(inputs=merged_inputs, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
     model.summary()
-    csv_logger = CSVLogger('ModalityNets/mn_NSL.history', append=True)
-    history = model.fit(train_dict, {'output': y}, shuffle=True,
-                        epochs=num_epochs, batch_size=batch_size,
-                        callbacks=[csv_logger],
-                        validation_data=(test_dict, test_y))
+    csv_logger = CSVLogger(root + 'modnet_nsl.history', append=True)
+    history = model.fit(train_dict, {'output': y}, batch_size,
+                        epochs=num_epochs, callbacks=[csv_logger])
     logger.debug(history)
-    score = model.evaluate(test_dict, test_y, test_y.shape[0], verbose=1)
-    logger.debug('ModalityNet NSL test loss\t%.6f' % score[0])
-    logger.info('ModalityNet NSL test accu\t%.6f' % score[1])
+    score = model.evaluate(train_dict, y, y.shape[0])
+    logger.debug('modnet[nsl] train loss\t%.6f' % score[0])
+    logger.info('modenet[nsl] train accu\t%.6f' % score[1])
+    modnet['nsl']['train'].append(score[1])
+
+    score = model.evaluate(test_dict, test_y, test_y.shape[0])
+    logger.debug('modnet[nsl] test loss\t%.6f' % score[0])
+    logger.info('modenet[nsl] test accu\t%.6f' % score[1])
+    modnet['nsl']['test'].append(score[1])
 
     EX, EX_test = get_intermediate_output(model, 'unified_nsl', merged_inputs,
                                           train_dict, test_dict)
@@ -244,17 +250,11 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
     return EX, EX_test, y, test_y
 
 
-def master_model(hidden, drop_prob=0.2, reg_beta=0.001):
+def unified_model(hidden, drop_prob=0.2, reg_beta=0.001):
     main_input = Input(shape=(hidden[0],), name='main_input')
-    h1 = Dense(hidden[1], activation='sigmoid', name='h1',
-               kernel_regularizer=regularizers.l2(reg_beta))(main_input)
-    dropout = Dropout(drop_prob)(h1)
-    bn = BatchNormalization(name='bn_1')(dropout)
-    # h2 = Dense(320, activation='sigmoid', name='h2',
-    # kernel_regularizer=regularizers.l2(reg_beta))(bn)
-    # dropout = Dropout(0.2)(h2)
-    # bn = BatchNormalization(name='bn_2')(dropout)
-    sm = Dense(2, activation='softmax', name='output')(bn)
+    bn = BatchNormalization(name='bn_unified')(main_input)
+    h1 = Dense(hidden[1], activation='sigmoid', name='h1')(bn)
+    sm = Dense(2, activation='softmax', name='output')(h1)
     model = Model(inputs=main_input, outputs=sm)
     model.compile(optimizer='adam', loss='binary_crossentropy',
                   metrics=['accuracy'])
@@ -262,83 +262,75 @@ def master_model(hidden, drop_prob=0.2, reg_beta=0.001):
     return model
 
 
-def train_with_single(hidden, EX, y, EXTs, test_ys, idx, drop_prob,
-                      num_epochs, batch_size,
-                      names=['UNSW', 'NSL']):
-    model = master_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
-    csv_logger = CSVLogger('ModalityNets/master_%s.history' % names[idx],
-                           append=True)
-    history = model.fit(EX, y, epochs=num_epochs, batch_size=batch_size,
-                        shuffle=True, steps_per_epoch=None,
-                        callbacks=[csv_logger],
-                        validation_data=(EXTs[idx], test_ys[idx]))
-    for (i, EXT) in enumerate(EXTs):
-        score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
-        logger.debug('Master trained with %s dataset %s test loss\t%.6f' %
-                     (names[idx], names[i], score[0]))
-        logger.info('Master trained with %s dataset %s test accu\t%.6f' %
-                    (names[idx], names[i], score[1]))
-    return history
-
-
-def train_with_both(hidden, EXs, ys, EXTs, test_ys, drop_prob,
-                    num_epochs, batch_size,
-                    names=['UNSW', 'NSL']):
+def both_dataset(hidden, EXs, ys, EXTs, test_ys, drop_prob,
+                 num_epochs, batch_size, names=['unsw', 'nsl']):
     EX = np.concatenate(EXs, axis=0)
     Ey = np.concatenate(ys, axis=0)
-    model = master_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
-    csv_logger = CSVLogger('ModalityNets/master_BOTH.history', append=True)
-    history = model.fit(EX, Ey, epochs=num_epochs,
-                        batch_size=batch_size, shuffle=True,
-                        steps_per_epoch=None, callbacks=[csv_logger])
+    model = unified_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
+    csv_logger = CSVLogger(root + 'unified.history', append=True)
+    model.fit(EX, Ey, batch_size, num_epochs, callbacks=[csv_logger])
+
     for (i, EXT) in enumerate(EXTs):
+        score = model.evaluate(EXs[i], ys[i], ys[i].shape[0])
+        logger.debug('unified[%s] train loss\t%.6f' % (names[i], score[0]))
+        logger.info('unified[%s] train accu\t%.6f' % (names[i], score[1]))
+        unified[names[i]]['train'].append(score[1])
+
         score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
-        logger.debug('Master trained with BOTH dataset %s test loss\t%.6f' %
-                     (names[i], score[0]))
-        logger.info('Master trained with BOTH dataset %s test accu\t%.6f' %
-                    (names[i], score[1]))
-
-    return history
+        logger.debug('unified[%s] test loss\t%.6f' % (names[i], score[0]))
+        logger.info('unified[%s] test accu\t%.6f' % (names[i], score[1]))
+        unified[names[i]]['test'].append(score[1])
 
 
-def run_master(united, h):
-    num_epochs = 40
-    batch_size = 80
+def run_master(united):
+    num_epochs = 20
+    batch_size = 100
     beta = 0.00
     drop_prob = 0.2
-    hidden_unsw = [256, united]
-    hidden_nsl = [256, united]
-    hidden_master = [united, h]
+    sigmoid_size = 400
+    hidden_unsw = [256, united, sigmoid_size]
+    hidden_nsl = [256, united, sigmoid_size]
+    hidden_master = [united, sigmoid_size]
+
     logger.info('Network Config: %s %s %s' % (hidden_unsw,
                                               hidden_nsl, hidden_master))
     EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
                                                batch_size, drop_prob, beta)
     EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
                                               batch_size, drop_prob, beta)
-    train_with_single(hidden_master, EX1, y1,
-                      [EXT1, EXT2], [test_y1, test_y2], 0, drop_prob,
-                      num_epochs, batch_size)
-    train_with_single(hidden_master, EX2, y2,
-                      [EXT1, EXT2], [test_y1, test_y2], 1, drop_prob,
-                      num_epochs, batch_size)
-    train_with_both(hidden_master, [EX1, EX2], [y1, y2],
-                    [EXT1, EXT2], [test_y1, test_y2], drop_prob,
-                    num_epochs, batch_size)
+    both_dataset(hidden_master, [EX1, EX2], [y1, y2],
+                 [EXT1, EXT2], [test_y1, test_y2], drop_prob,
+                 num_epochs, batch_size)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger('modality_nets')
-    hdlr = logging.FileHandler('ModalityNets/accuracy.log')
+    root = 'ModalityNets/'
+    logger = logging.getLogger('ModalityNets')
+    hdlr = logging.FileHandler(root + 'accuracy.log')
     formatter = logging.Formatter('%(asctime)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
 
     # layer_sizes = [180, 240, 270, 360, 480, 540]
-    layer_sizes = [480]
+    unified_configs = [480]
     num_runs = 10
-    for _ in range(num_runs):
-        for united in layer_sizes:
-            for h in layer_sizes:
-                run_master(united, h)
+    for u in unified_configs:
+        modnet = {'unsw': {'test': [], 'train': []},
+                  'nsl': {'test': [], 'train': []}}
+        unified = {'unsw': {'test': [], 'train': []},
+                   'nsl': {'test': [], 'train': []}}
+        for _ in range(num_runs):
+            logger.info('************************************************')
+            logger.info('****  Start %d runs with unified config %s  ****'
+                        % (num_runs, u))
+            logger.info('************************************************')
+            run_master(u)
+        result = {'modnet': modnet, 'unified': unified}
+        output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'wb+')
+        pickle.dump(result, output)
+        output.close()
+        # output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'rb')
+        # pprint.pprint(pickle.load(output))
+        # output.close()
