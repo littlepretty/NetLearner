@@ -5,7 +5,7 @@ from keras.layers import Embedding, BatchNormalization
 from keras.callbacks import CSVLogger
 from preprocess import unsw, nslkdd
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-import pprint
+from pprint import pprint
 import pickle
 import pandas as pd
 import numpy as np
@@ -321,13 +321,15 @@ if __name__ == '__main__':
                   'nsl': {'test': [], 'train': []}}
         unified = {'unsw': {'test': [], 'train': []},
                    'nsl': {'test': [], 'train': []}}
+        logger.info('************************************************')
+        logger.info('****  Start %d runs with unified config %s  ****'
+                    % (num_runs, u))
+        logger.info('************************************************')
         for _ in range(num_runs):
-            logger.info('************************************************')
-            logger.info('****  Start %d runs with unified config %s  ****'
-                        % (num_runs, u))
-            logger.info('************************************************')
             run_master(u)
+
         result = {'modnet': modnet, 'unified': unified}
+        pprint(result)
         output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'wb+')
         pickle.dump(result, output)
         output.close()
