@@ -1,97 +1,50 @@
-import numpy as np
-import logging
-from scipy import stats
+from numpy import mean, std
+import pickle
+from pprint import pprint
 
+num_runs = 10
+U = 640
+f = open('result_runs%s_U%d.pkl' % (num_runs, U), 'rb')
+data = pickle.load(f)
+f.close()
+ae_unsw_train = data['ae']['unsw']['train']
+ae_nsl_train = data['ae']['nsl']['train']
+ae_unsw_test = data['ae']['unsw']['test']
+ae_nsl_test = data['ae']['nsl']['test']
 
-def extract_avg(filename, num_runs=10):
-    f = open(filename, 'r')
-    f.readline()
-    f.readline()
-    f.readline()
+sae_unsw_train = data['sae']['unsw']['train']
+sae_nsl_train = data['sae']['nsl']['train']
+sae_unsw_test = data['sae']['unsw']['test']
+sae_nsl_test = data['sae']['nsl']['test']
 
-    accu = {x: [] for x in range(1, 5)}
-    accu[5] = {'unsw': [], 'nsl': []}
-    accu[6] = {'unsw': [], 'nsl': []}
+ae_unified_unsw_train = data['ae_unified']['unsw']['train']
+ae_unified_nsl_train = data['ae_unified']['nsl']['train']
+ae_unified_unsw_test = data['ae_unified']['unsw']['test']
+ae_unified_nsl_test = data['ae_unified']['nsl']['test']
 
-    for _ in range(num_runs):
-        f.readline()
-        f.readline()
-        f.readline()
+sae_unified_unsw_train = data['sae_unified']['unsw']['train']
+sae_unified_nsl_train = data['sae_unified']['nsl']['train']
+sae_unified_unsw_test = data['sae_unified']['unsw']['test']
+sae_unified_nsl_test = data['sae_unified']['nsl']['test']
 
-        line = f.readline().strip().split()
-        if len(line) == 0:
-            break
+unsw_train_avgs = [mean(ae_unsw_train), mean(sae_unsw_train),
+                   mean(ae_unified_unsw_train), mean(sae_unified_unsw_train)]
+nsl_train_avgs = [mean(ae_nsl_train), mean(sae_nsl_train),
+                  mean(ae_unified_nsl_train), mean(sae_unified_nsl_train)]
+unsw_test_avgs = [mean(ae_unsw_test), mean(sae_unsw_test),
+                  mean(ae_unified_unsw_test), mean(sae_unified_unsw_test)]
+nsl_test_avgs = [mean(ae_nsl_test), mean(sae_nsl_test),
+                 mean(ae_unified_nsl_test), mean(sae_unified_nsl_test)]
 
-        accu[6]['unsw'].append(float(line[-1]))
-        line = f.readline().strip().split()
-        accu[6]['nsl'].append(float(line[-1]))
-
-        line = f.readline().strip().split()
-        accu[3].append(float(line[-1]))
-        line = f.readline().strip().split()
-        accu[1].append(float(line[-1]))
-
-        f.readline()
-        line = f.readline().strip().split()
-        accu[5]['unsw'].append(float(line[-1]))
-        line = f.readline().strip().split()
-        accu[5]['nsl'].append(float(line[-1]))
-
-        line = f.readline().strip().split()
-        accu[4].append(float(line[-1]))
-        line = f.readline().strip().split()
-        accu[2].append(float(line[-1]))
-
-    # list_mean_accuracies(accu)
-    mean_improvement(accu, key1=2, key2=1, dataset='nsl')
-    mean_improvement(accu, key1=4, key2=3, dataset='unsw')
-    mean_improvement(accu, key1=5, key2=6, dataset='nsl')
-    mean_improvement(accu, key1=5, key2=6, dataset='unsw')
-
-
-def mean_improvement(accu, key1, key2, dataset):
-    if dataset in accu[key1]:
-        improve_sum = np.subtract(accu[key1][dataset], accu[key2][dataset])
-        improve = np.divide(improve_sum, accu[key2][dataset])
-        (t, p_value) = stats.ttest_ind(accu[key1][dataset],
-                                       accu[key2][dataset], equal_var=False)
-    else:
-        improve_sum = np.subtract(accu[key1], accu[key2])
-        improve = np.divide(improve_sum, accu[key2])
-        (t, p_value) = stats.ttest_ind(accu[key1], accu[key2], equal_var=False)
-
-    absolute_mean = np.mean(improve_sum) * 100
-    relative_mean = np.mean(improve) * 100
-    logger.info('\t%s accu%s over accu%s' % (dataset, key1, key2))
-    logger.info('\t\tmean absolute accu increase: %.6f%%' % absolute_mean)
-    logger.info('\t\tmean relative accu increase: %.6f%%' % relative_mean)
-    logger.info('\t\tp-value in t-test: %.6f%%' % (p_value * 100))
-
-
-def list_mean_accuracies(accu):
-    for (key, value) in accu.items():
-        if key in range(1, 5):
-            logger.info("accu%s: avg %.6f, std %.6f for %d runs" %
-                        (key, np.mean(value), np.std(value), len(value)))
-        else:
-            for (x, y) in value.items():
-                logger.info("accu%s[%s]: avg %.6f, std %.6f for %d runs" %
-                            (key, x, np.mean(y), np.std(y), len(y)))
-
-
-if __name__ == '__main__':
-    configs = [320, 400, 480, 500, 512, 570, 640]
-    dirname = 'H1X2Config'
-    logfiles = ['%s/accuracy_%d.log' % (dirname, x) for x in configs]
-
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger()
-    hdlr = logging.FileHandler('stat_accuracy.log')
-    formatter = logging.Formatter('%(asctime)s %(message)s')
-    hdlr.setFormatter(formatter)
-    logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
-
-    for (i, d) in enumerate(configs):
-        logger.info('When use config %d' % d)
-        extract_avg(logfiles[i])
+unsw_train_stds = [std(ae_unsw_train), std(sae_unsw_train),
+                   std(ae_unified_unsw_train), std(sae_unified_unsw_train)]
+nsl_train_stds = [std(ae_nsl_train), std(sae_nsl_train),
+                  std(ae_unified_nsl_train), std(sae_unified_nsl_train)]
+unsw_test_stds = [std(ae_unsw_test), std(sae_unsw_test),
+                  std(ae_unified_unsw_test), std(sae_unified_unsw_test)]
+nsl_test_stds = [std(ae_nsl_test), std(sae_nsl_test),
+                 std(ae_unified_nsl_test), std(sae_unified_nsl_test)]
+pprint(unsw_train_avgs)
+pprint(nsl_train_avgs)
+pprint(unsw_test_avgs)
+pprint(nsl_test_avgs)

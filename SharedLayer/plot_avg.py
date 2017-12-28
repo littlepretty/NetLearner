@@ -19,3 +19,4 @@ test_stds = [np.std(shared_unsw_test), np.std(shared_nsl_test)]
 pprint(train_avgs)
 pprint(test_avgs)
 pprint(test_stds)
+f.close()

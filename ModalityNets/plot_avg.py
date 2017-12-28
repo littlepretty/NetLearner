@@ -43,3 +43,4 @@ test_stds = [np.std(modnet_unsw_test), np.std(unified_unsw_test),
 pprint(train_avgs)
 pprint(test_avgs)
 pprint(test_stds)
+f.close()
