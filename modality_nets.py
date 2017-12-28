@@ -124,8 +124,7 @@ def get_intermediate_output(model, layer_name, inputs, train_dict, test_dict):
     return EX, EX_test
 
 
-def modality_net_unsw(hidden, num_epochs, batch_size,
-                      drop_prob=0.2, reg_beta=0.001):
+def modality_net_unsw(hidden):
     dataset_names = ['UNSW/UNSW_NB15_%s-set.csv' % x
                      for x in ['training', 'testing']]
     feature_file = 'UNSW/feature_names_train_test.csv'
@@ -170,7 +169,7 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
     csv_logger = CSVLogger(root + 'modnet_unsw.history', append=True)
     history = model.fit(train_dict, {'output': y}, batch_size, num_epochs,
                         callbacks=[csv_logger])
-    logger.debug(history)
+    modnet['unsw_loss'].append(history.history['loss'])
     score = model.evaluate(train_dict, y, y.shape[0])
     logger.debug('modnet[unsw] train loss\t%.6f' % score[0])
     logger.info('modenet[unsw] train accu\t%.6f' % score[1])
@@ -188,8 +187,7 @@ def modality_net_unsw(hidden, num_epochs, batch_size,
     return EX, EX_test, y, test_y
 
 
-def modality_net_nsl(hidden, num_epochs, batch_size,
-                     drop_prob=0.2, reg_beta=0.001):
+def modality_net_nsl(hidden):
     dataset_names = ['NSLKDD/KDD%s.csv' % x for x in ['Train', 'Test']]
     feature_file = 'NSLKDD/feature_names.csv'
     headers, _, _, _ = nslkdd.get_feature_names(feature_file)
@@ -231,8 +229,8 @@ def modality_net_nsl(hidden, num_epochs, batch_size,
     model.summary()
     csv_logger = CSVLogger(root + 'modnet_nsl.history', append=True)
     history = model.fit(train_dict, {'output': y}, batch_size,
-                        epochs=num_epochs, callbacks=[csv_logger])
-    logger.debug(history)
+                        num_epochs, callbacks=[csv_logger])
+    modnet['nsl_loss'].append(history.history['loss'])
     score = model.evaluate(train_dict, y, y.shape[0])
     logger.debug('modnet[nsl] train loss\t%.6f' % score[0])
     logger.info('modenet[nsl] train accu\t%.6f' % score[1])
@@ -262,13 +260,17 @@ def unified_model(hidden, drop_prob=0.2, reg_beta=0.001):
     return model
 
 
-def both_dataset(hidden, EXs, ys, EXTs, test_ys, drop_prob,
-                 num_epochs, batch_size, names=['unsw', 'nsl']):
-    EX = np.concatenate(EXs, axis=0)
-    Ey = np.concatenate(ys, axis=0)
+def both_dataset(hidden, EXs, ys, EXTs, test_ys, names=['unsw', 'nsl']):
     model = unified_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
-    csv_logger = CSVLogger(root + 'unified.history', append=True)
-    model.fit(EX, Ey, batch_size, num_epochs, callbacks=[csv_logger])
+    unsw_loss, nsl_loss = [], []
+    for _ in range(num_epochs):
+        history = model.fit(EXs[0], ys[0], batch_size, 1)
+        unsw_loss.append(history.history['loss'])
+        history = model.fit(EXs[1], ys[1], batch_size, 1)
+        nsl_loss.append(history.history['loss'])
+
+    unified['unsw_loss'].append(unsw_loss)
+    unified['nsl_loss'].append(nsl_loss)
 
     for (i, EXT) in enumerate(EXTs):
         score = model.evaluate(EXs[i], ys[i], ys[i].shape[0])
@@ -282,25 +284,14 @@ def both_dataset(hidden, EXs, ys, EXTs, test_ys, drop_prob,
         unified[names[i]]['test'].append(score[1])
 
 
-def run_master(united):
-    num_epochs = 20
-    batch_size = 100
-    beta = 0.00
-    drop_prob = 0.2
-    sigmoid_size = 400
-    hidden_unsw = [256, united, sigmoid_size]
-    hidden_nsl = [256, united, sigmoid_size]
-    hidden_master = [united, sigmoid_size]
+def run_master(hidden_config):
+    EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_config)
+    EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_config)
 
-    logger.info('Network Config: %s %s %s' % (hidden_unsw,
-                                              hidden_nsl, hidden_master))
-    EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_unsw, num_epochs,
-                                               batch_size, drop_prob, beta)
-    EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_nsl, num_epochs,
-                                              batch_size, drop_prob, beta)
+    hidden_master = [hidden_config[-2], hidden_config[-1]]
+    logger.info('Unified Net Config: %s' % hidden_master)
     both_dataset(hidden_master, [EX1, EX2], [y1, y2],
-                 [EXT1, EXT2], [test_y1, test_y2], drop_prob,
-                 num_epochs, batch_size)
+                 [EXT1, EXT2], [test_y1, test_y2])
 
 
 if __name__ == '__main__':
@@ -314,25 +305,31 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
 
     # layer_sizes = [180, 240, 270, 360, 480, 540]
-    unified_configs = [480]
+    unified_configs = [[640, 320, 400]]
     num_runs = 10
-    for u in unified_configs:
+    num_epochs = 80
+    batch_size = 160
+    beta = 0.00
+    drop_prob = 0.2
+    for config in unified_configs:
         modnet = {'unsw': {'test': [], 'train': []},
+                  'unsw_loss': [], 'nsl_loss': [],
                   'nsl': {'test': [], 'train': []}}
         unified = {'unsw': {'test': [], 'train': []},
+                   'unsw_loss': [], 'nsl_loss': [],
                    'nsl': {'test': [], 'train': []}}
         logger.info('************************************************')
         logger.info('****  Start %d runs with unified config %s  ****'
-                    % (num_runs, u))
+                    % (num_runs, config))
         logger.info('************************************************')
         for _ in range(num_runs):
-            run_master(u)
+            run_master(config)
 
-        result = {'modnet': modnet, 'unified': unified}
+        result = {'modnet': modnet, 'unified': unified,
+                  'epochs': num_epochs, 'batch_size': batch_size,
+                  'hidden_config': config, 'dropout': drop_prob, 'beta': beta}
         pprint(result)
-        output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'wb+')
+        output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, config[1]),
+                      'wb+')
         pickle.dump(result, output)
         output.close()
-        # output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'rb')
-        # pprint.pprint(pickle.load(output))
-        # output.close()
