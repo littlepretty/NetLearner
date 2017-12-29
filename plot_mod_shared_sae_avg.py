@@ -1,8 +1,8 @@
 from numpy import mean, std, arange
 import pickle
-from pprint import pprint
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
 
 
 def autolabel(rects):
@@ -12,8 +12,10 @@ def autolabel(rects):
                 '%.2f' % height, ha='center', va='bottom')
 
 
-num_runs = 10
-U = 540
+print('python %s num_runs U if_plot' % sys.argv[0])
+num_runs = int(sys.argv[1])
+U = int(sys.argv[2])
+if_plot = str(sys.argv[3])
 
 f = open('SharedAutoEncoder/result_runs%s_U%d.pkl' % (num_runs, U), 'rb')
 data = pickle.load(f)
@@ -108,50 +110,51 @@ nsl_test_stds = [std(modnet_nsl_test), std(unified_nsl_test),
                  std(sae_nsl_test), std(ae_unified_nsl_test),
                  std(sae_unified_nsl_test)]
 
-pprint(unsw_train_avgs)
-pprint(nsl_train_avgs)
-pprint(unsw_test_avgs)
-pprint(nsl_test_avgs)
+# print(unsw_train_avgs)
+# print(nsl_train_avgs)
+print(unsw_test_avgs)
+print(nsl_test_avgs)
 
-matplotlib.rc('font', size=18)
-ind = arange(len(unsw_train_avgs))
-width = 0.36
-tick_labels = ('modality', 'unified', 'shared', 'ae', 'sae',
-               'ae_unified', 'sae_unified')
-fig, ax = plt.subplots()
-rects1 = ax.bar(ind, [x * 100 for x in unsw_train_avgs], width, color='b',
-                yerr=unsw_train_stds)
-rects2 = ax.bar(ind + width, [x * 100 for x in unsw_test_avgs],
-                width, color='r', yerr=unsw_test_stds)
+if if_plot == 'true':
+    matplotlib.rc('font', size=18)
+    ind = arange(len(unsw_train_avgs))
+    width = 0.36
+    tick_labels = ('modality', 'unified', 'shared', 'ae', 'sae',
+                   'ae_unified', 'sae_unified')
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(ind, [x * 100 for x in unsw_train_avgs], width, color='b',
+                    yerr=unsw_train_stds)
+    rects2 = ax.bar(ind + width, [x * 100 for x in unsw_test_avgs],
+                    width, color='r', yerr=unsw_test_stds)
 
-ax.set_ylabel('Train/Test Accuracy(%) for UNSW-NB15 dataset')
-ax.set_xticks(ind + width / 2)
-ax.set_xticklabels(tick_labels)
-ax.legend((rects1[0], rects2[0]), ('Train', 'Test'))
+    ax.set_ylabel('Train/Test Accuracy(%) for UNSW-NB15 dataset')
+    ax.set_xticks(ind + width / 2)
+    ax.set_xticklabels(tick_labels)
+    ax.legend((rects1[0], rects2[0]), ('Train', 'Test'))
 
-autolabel(rects1)
-autolabel(rects2)
+    autolabel(rects1)
+    autolabel(rects2)
 
-plt.ylim((80, 101))
-plt.grid()
-plt.show()
+    plt.ylim((80, 101))
+    plt.grid()
+    plt.show()
 
-ind = arange(len(nsl_train_avgs))
-width = 0.36
-fig, ax = plt.subplots()
-rects1 = ax.bar(ind, [x * 100 for x in nsl_train_avgs], width, color='b',
-                yerr=[x * 100 for x in nsl_train_stds])
-rects2 = ax.bar(ind + width, [x * 100 for x in nsl_test_avgs],
-                width, color='r', yerr=[x * 100 for x in nsl_test_stds])
+    ind = arange(len(nsl_train_avgs))
+    width = 0.36
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(ind, [x * 100 for x in nsl_train_avgs], width, color='b',
+                    yerr=[x * 100 for x in nsl_train_stds])
+    rects2 = ax.bar(ind + width, [x * 100 for x in nsl_test_avgs],
+                    width, color='r', yerr=[x * 100 for x in nsl_test_stds])
 
-ax.set_ylabel('Train/Test Accuracy(%) for NSL-KDD dataset')
-ax.set_xticks(ind + width / 2)
-ax.set_xticklabels(tick_labels)
-ax.legend((rects1[0], rects2[0]), ('Train', 'Test'))
+    ax.set_ylabel('Train/Test Accuracy(%) for NSL-KDD dataset')
+    ax.set_xticks(ind + width / 2)
+    ax.set_xticklabels(tick_labels)
+    ax.legend((rects1[0], rects2[0]), ('Train', 'Test'))
 
-autolabel(rects1)
-autolabel(rects2)
+    autolabel(rects1)
+    autolabel(rects2)
 
-plt.ylim((72, 102))
-plt.grid()
-plt.show()
+    plt.ylim((72, 102))
+    plt.grid()
+    plt.show()
