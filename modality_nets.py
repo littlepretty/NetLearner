@@ -284,11 +284,11 @@ def both_dataset(hidden, EXs, ys, EXTs, test_ys, names=['unsw', 'nsl']):
         unified[names[i]]['test'].append(score[1])
 
 
-def run_master(hidden_config):
-    EX1, EXT1, y1, test_y1 = modality_net_unsw(hidden_config)
-    EX2, EXT2, y2, test_y2 = modality_net_nsl(hidden_config)
+def run_master(unsw_config, nsl_config):
+    EX1, EXT1, y1, test_y1 = modality_net_unsw(unsw_config)
+    EX2, EXT2, y2, test_y2 = modality_net_nsl(nsl_config)
 
-    hidden_master = [hidden_config[-2], hidden_config[-1]]
+    hidden_master = [unsw_config[-2], unsw_config[-1]]
     logger.info('Unified Net Config: %s' % hidden_master)
     both_dataset(hidden_master, [EX1, EX2], [y1, y2],
                  [EXT1, EXT2], [test_y1, test_y2])
@@ -304,32 +304,35 @@ if __name__ == '__main__':
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
 
-    # layer_sizes = [180, 240, 270, 360, 480, 540]
-    unified_configs = [[640, 320, 400]]
-    num_runs = 10
-    num_epochs = 80
+    h_front = [[640, 480]]
+    h_unified = [512]
+    h_cls = [400]
+    num_runs = 30
+    num_epochs = 36
     batch_size = 160
     beta = 0.00
     drop_prob = 0.2
-    for config in unified_configs:
+    for (i, u) in enumerate(h_unified):
+        unsw_config = [h_front[i][0], u, h_cls[i]]
+        nsl_config = [h_front[i][1], u, h_cls[i]]
         modnet = {'unsw': {'test': [], 'train': []},
                   'unsw_loss': [], 'nsl_loss': [],
                   'nsl': {'test': [], 'train': []}}
         unified = {'unsw': {'test': [], 'train': []},
                    'unsw_loss': [], 'nsl_loss': [],
                    'nsl': {'test': [], 'train': []}}
-        logger.info('************************************************')
-        logger.info('****  Start %d runs with unified config %s  ****'
-                    % (num_runs, config))
-        logger.info('************************************************')
+        logger.info('**********************************************')
+        logger.info('****  Start %d runs with config %s %s  ****'
+                    % (num_runs, unsw_config, nsl_config))
+        logger.info('**********************************************')
         for _ in range(num_runs):
-            run_master(config)
+            run_master(unsw_config, nsl_config)
 
         result = {'modnet': modnet, 'unified': unified,
                   'epochs': num_epochs, 'batch_size': batch_size,
-                  'hidden_config': config, 'dropout': drop_prob, 'beta': beta}
+                  'unsw_config': unsw_config, 'nsl_config': nsl_config,
+                  'dropout': drop_prob, 'beta': beta}
         pprint(result)
-        output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, config[1]),
-                      'wb+')
+        output = open(root + 'result_runs%d_U%d.pkl' % (num_runs, u), 'wb+')
         pickle.dump(result, output)
         output.close()

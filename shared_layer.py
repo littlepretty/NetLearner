@@ -1,16 +1,16 @@
+from preprocess import unsw, nslkdd
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from pprint import pprint
 from keras.models import Model
 from keras.layers import Dense, Input, concatenate, Flatten, Dropout
 # from keras import regularizers
 from keras.layers import Embedding, BatchNormalization
 # from keras.callbacks import CSVLogger
-
-from preprocess import unsw, nslkdd
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
-from pprint import pprint
+from keras import backend as K
 import pickle
+import logging
 import pandas as pd
 import numpy as np
-import logging
 
 
 def get_dataset(dataset_filename, headers, dataset_name):
@@ -182,22 +182,23 @@ def get_nsl_data():
     return merge, merged_inputs, train_dict, test_dict, y, test_y
 
 
-def shared_models(unsw, nsl, unsw_inputs, nsl_inputs, hidden):
-    h1_unsw = Dense(hidden[0], activation='relu', name='h1_unsw')(unsw)
-    h1_nsl = Dense(hidden[0], activation='relu', name='h1_nsl')(nsl)
+def shared_models(unsw, nsl, unsw_inputs, nsl_inputs, unsw_hidden, nsl_hidden):
+    h1_unsw = Dense(unsw_hidden[0], activation='relu', name='h1_unsw')(unsw)
+    h1_nsl = Dense(nsl_hidden[0], activation='relu', name='h1_nsl')(nsl)
     h1_unsw = Dropout(dropprob)(h1_unsw)
     h1_nsl = Dropout(dropprob)(h1_nsl)
 
-    shared_h2 = Dense(hidden[1], activation='relu', name='shared_layer')
-    h2_unsw = shared_h2(h1_unsw)
-    h2_nsl = shared_h2(h1_nsl)
+    h2_unsw = Dense(unsw_hidden[1], activation='relu', name='h2_unsw')(h1_unsw)
+    h2_nsl = Dense(nsl_hidden[1], activation='relu', name='h2_nsl')(h1_nsl)
 
     bn_unsw = BatchNormalization(name='bn_unsw')(h2_unsw)
     bn_nsl = BatchNormalization(name='bn_nsl')(h2_nsl)
 
-    shared_h3 = Dense(hidden[2], activation='sigmoid', name='h3_unsw')
+    shared_h3 = Dense(unsw_hidden[2], activation='sigmoid', name='h3_unsw')
     h3_unsw = shared_h3(bn_unsw)
     h3_nsl = shared_h3(bn_nsl)
+    h3_unsw = Dropout(dropprob)(h3_unsw)
+    h3_nsl = Dropout(dropprob)(h3_nsl)
 
     shared_sm = Dense(2, activation='softmax', name='output')
     output_unsw = shared_sm(h3_unsw)
@@ -211,13 +212,14 @@ def shared_models(unsw, nsl, unsw_inputs, nsl_inputs, hidden):
     nsl_model.compile(optimizer='adam', loss='binary_crossentropy',
                       metrics=['accuracy'])
 
-    unsw_model.summary()
-    nsl_model.summary()
+    # unsw_model.summary()
+    # nsl_model.summary()
     return unsw_model, nsl_model
 
 
-def run_main(hidden):
-    m1, m2 = shared_models(unsw_tens, nsl_tens, unsw_inputs, nsl_inputs, hidden)
+def run_main(unsw_hidden, nsl_hidden):
+    m1, m2 = shared_models(unsw_tens, nsl_tens,
+                           unsw_inputs, nsl_inputs, unsw_hidden, nsl_hidden)
     unsw_loss, nsl_loss = [], []
     for _ in range(num_epochs):
         num_batch_runs = -(-max(unsw_size, nsl_size) // batch_size)
@@ -279,32 +281,35 @@ if __name__ == '__main__':
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-
     unsw_tens, unsw_inputs, X_unsw, X_unsw_test, y_unsw, y_unsw_test = \
         get_unsw_data()
     nsl_tens, nsl_inputs, X_nsl, X_nsl_test, y_nsl, y_nsl_test = \
         get_nsl_data()
     unsw_size, nsl_size = y_unsw.shape[0], y_nsl.shape[0]
-    num_runs = 10
-    num_epochs = 42
+    num_runs = 30
+    num_epochs = 36
     batch_size = 160
     dropprob = 0.2
-    hidden_configs = [[640, 320, 400]]
-    for hidden in hidden_configs:
+    h_front = [[640, 480]]
+    h_shared = [512]
+    h_cls = [400]
+    for (i, s) in enumerate(h_shared):
+        unsw_config = [h_front[i][0], s, h_cls[i]]
+        nsl_config = [h_front[i][1], s, h_cls[i]]
         shared = {'unsw': {'train': [], 'test': []},
                   'unsw_loss': [], 'nsl_loss': [],
                   'nsl': {'train': [], 'test': []},
                   'epochs': num_epochs, 'batch_size': batch_size,
-                  'dropprob': dropprob, 'hidden': hidden}
+                  'dropprob': dropprob, 'unsw_hidden': unsw_config,
+                  'nsl_hidden': nsl_config}
         logger.info('************************************************')
-        logger.info('****  Start %d runs with shared config %s  ****'
-                    % (num_runs, hidden))
+        logger.info('****  Start %d runs with config %s + %s  ****'
+                    % (num_runs, unsw_config, nsl_config))
         logger.info('************************************************')
         for _ in range(num_runs):
-            run_main(hidden)
-        pprint(shared['unsw'])
-        pprint(shared['nsl'])
-        output = open(root + 'result_runs%s_U%d.pkl' % (num_runs, hidden[1]),
-                      'wb+')
+            run_main(unsw_config, nsl_config)
+        pprint(shared)
+        output = open(root + 'result_runs%s_U%d.pkl' % (num_runs, s), 'wb+')
         pickle.dump(shared, output)
         output.close()
+        K.clear_session()
