@@ -182,7 +182,7 @@ def modality_net_unsw(hidden):
 
     EX, EX_test = get_intermediate_output(model, 'unified_unsw', merged_inputs,
                                           train_dict, test_dict)
-    # model.save('ModalityNets/UNSW.h5')
+    model.save_weights('ModalityNets/modnet_unsw.h5', by_name=True)
     # np.savez('ModalityNets/unsw_EX.npy', train=EX, test=EX_test)
     return EX, EX_test, y, test_y
 
@@ -243,7 +243,7 @@ def modality_net_nsl(hidden):
 
     EX, EX_test = get_intermediate_output(model, 'unified_nsl', merged_inputs,
                                           train_dict, test_dict)
-    # model.save('ModalityNets/NSL.h5')
+    model.save_weights('ModalityNets/modnet_nsl.h5', by_name=True)
     # np.savez('ModalityNets/nsl_EX.npy', train=EX, test=EX_test)
     return EX, EX_test, y, test_y
 
@@ -261,24 +261,27 @@ def unified_model(hidden, drop_prob=0.2, reg_beta=0.001):
 
 
 def both_dataset(hidden, EXs, ys, EXTs, test_ys, names=['unsw', 'nsl']):
-    model = unified_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
+    m = unified_model(hidden, drop_prob=drop_prob, reg_beta=0.00)
     unsw_loss, nsl_loss = [], []
+    UEX = np.concatenate(EXs, axis=0)
+    Uy = np.concatenate(ys, axis=0)
     for _ in range(num_epochs):
-        history = model.fit(EXs[0], ys[0], batch_size, 1)
-        unsw_loss.append(history.history['loss'])
-        history = model.fit(EXs[1], ys[1], batch_size, 1)
-        nsl_loss.append(history.history['loss'])
+        m.fit(UEX, Uy, batch_size, 1, verbose=0)
+        score = m.evaluate(EXs[0], ys[0], ys[0].shape[0], verbose=0)
+        unsw_loss.append(score[0])
+        score = m.evaluate(EXs[1], ys[1], ys[1].shape[0], verbose=0)
+        nsl_loss.append(score[0])
 
     unified['unsw_loss'].append(unsw_loss)
     unified['nsl_loss'].append(nsl_loss)
 
     for (i, EXT) in enumerate(EXTs):
-        score = model.evaluate(EXs[i], ys[i], ys[i].shape[0])
+        score = m.evaluate(EXs[i], ys[i], ys[i].shape[0])
         logger.debug('unified[%s] train loss\t%.6f' % (names[i], score[0]))
         logger.info('unified[%s] train accu\t%.6f' % (names[i], score[1]))
         unified[names[i]]['train'].append(score[1])
 
-        score = model.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
+        score = m.evaluate(EXTs[i], test_ys[i], test_ys[i].shape[0])
         logger.debug('unified[%s] test loss\t%.6f' % (names[i], score[0]))
         logger.info('unified[%s] test accu\t%.6f' % (names[i], score[1]))
         unified[names[i]]['test'].append(score[1])
