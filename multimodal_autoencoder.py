@@ -3,7 +3,7 @@ from keras.layers import Dense, Input
 # from keras.layers import Dropout
 from keras import regularizers
 # from keras.layers import BatchNormalization
-from keras.callbacks import CSVLogger
+# from keras.callbacks import CSVLogger
 # from keras import initializers
 
 import tensorflow as tf
@@ -58,38 +58,31 @@ def process_nsl(root='SharedAutoEncoder/'):
 
 def single_encoder(feature_dim, H1, U):
     input_layer = Input(shape=(feature_dim, ), name='unsw')
-
     h1 = Dense(H1, activation='relu', name='h1')(input_layer)
     # bn1 = BatchNormalization(name='bn1')(h1)
-
     encoding = Dense(U, activation='relu', name='encoding')(h1)
     # bn2 = BatchNormalization(name='bn2')(encoding)
-
     h3 = Dense(H1, activation='relu', name='h3')(encoding)
     # bn3 = BatchNormalization(name='bn3')(h3)
-
     h4 = Dense(feature_dim, activation='sigmoid', name='h4')(h3)
 
     model = Model(inputs=input_layer, outputs=h4)
-    model.compile(optimizer='adadelta', loss='binary_crossentropy')
+    model.compile(optimizer='adam', loss='binary_crossentropy')
 
     encoder = Model(inputs=input_layer, outputs=encoding)  # or bn2
     return model, encoder
 
 
-def multimodal_autoencoder(unsw_dim, nsl_dim, H1, U, sparse=0.00):
+def multimodal_autoencoder(unsw_dim, nsl_dim, H1, U):
     unsw = Input(shape=(unsw_dim, ), name='input_unsw')
     nsl = Input(shape=(nsl_dim, ), name='input_nsl')
 
-    h1_unsw = Dense(H1, activation='relu', name='h1_unsw',
-                    activity_regularizer=regularizers.l1(sparse))(unsw)
-    h1_nsl = Dense(H1, activation='relu', name='h1_nsl',
-                   activity_regularizer=regularizers.l1(sparse))(nsl)
+    h1_unsw = Dense(H1, activation='relu', name='h1_unsw')(unsw)
+    h1_nsl = Dense(H1, activation='relu', name='h1_nsl')(nsl)
     # h1_unsw = BatchNormalization(name='bn1_unsw')(h1_unsw)
     # h1_nsl = BatchNormalization(name='bn1_nsl')(h1_nsl)
 
-    shared_ae = Dense(U, activation='relu', name='shared',
-                      activity_regularizer=regularizers.l1(sparse))
+    shared_ae = Dense(U, activation='relu', name='shared')
     shared_unsw = shared_ae(h1_unsw)
     shared_nsl = shared_ae(h1_nsl)
     # bns_unsw = BatchNormalization(name='bn2_unsw')(shared_unsw)
@@ -103,16 +96,12 @@ def multimodal_autoencoder(unsw_dim, nsl_dim, H1, U, sparse=0.00):
     h4_unsw = Dense(unsw_dim, activation='sigmoid', name='h4_unsw')(h3_unsw)
     h4_nsl = Dense(nsl_dim, activation='sigmoid', name='h4_nsl')(h3_nsl)
 
-    shared_model = Model(inputs=[unsw, nsl], outputs=[h4_unsw, h4_nsl])
-    shared_model.compile(optimizer='adadelta', loss='binary_crossentropy')
-    shared_model.summary()
-
     model_unsw = Model(inputs=unsw, output=h4_unsw)
-    model_unsw.compile(optimizer='adadelta', loss='binary_crossentropy')
+    model_unsw.compile(optimizer='adam', loss='binary_crossentropy')
     model_unsw.summary()
 
     model_nsl = Model(inputs=nsl, output=h4_nsl)
-    model_nsl.compile(optimizer='adadelta', loss='binary_crossentropy')
+    model_nsl.compile(optimizer='adam', loss='binary_crossentropy')
     model_nsl.summary()
 
     encoder_unsw = Model(inputs=unsw, outputs=shared_unsw)
@@ -135,9 +124,9 @@ def linear_model(feature_dim, reg_beta=0.00):
 def train_single_encoder(X, X_test, H1, U, num_epochs, batch_size, name):
     feature_dim = X.shape[1]
     model, encoder = single_encoder(feature_dim, H1, U)
-    csv_logger = CSVLogger(root_dir + 'ae_%s.history' % name, append=True)
-    model.fit(X, X, epochs=num_epochs, batch_size=batch_size,
-              callbacks=[csv_logger], verbose=0)
+    # csv_logger = CSVLogger(root_dir + 'ae_%s.history' % name, append=True)
+    # model.fit(X, X, batch_size, num_epochs, callbacks=[csv_logger])
+    model.fit(X, X, batch_size, num_epochs, verbose=0)
     EX = encoder.predict(X)
     EX_test = encoder.predict(X_test)
 
@@ -147,7 +136,7 @@ def train_single_encoder(X, X_test, H1, U, num_epochs, batch_size, name):
 def train_linear_model(X, y, X_test, y_test, num_epochs, batch_size, beta):
     feature_dim = X.shape[1]
     classifier = linear_model(feature_dim, beta)
-    classifier.fit(X, y, batch_size=batch_size, epochs=num_epochs, verbose=0)
+    classifier.fit(X, y, batch_size, num_epochs, verbose=0)
     scores = classifier.evaluate(X_test, y_test, batch_size=X_test.shape[0])
     return scores, classifier
 
@@ -212,17 +201,17 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
         unsw_dim, nsl_dim, H1, U)
     encoder_loss = [[], []]
     for _ in range(num_epochs):
-        unsw_model.fit(X_unsw, X_unsw, epochs=1, batch_size=batch_size)
+        unsw_model.fit(X_unsw, X_unsw, batch_size, epochs=1)
         encoder_loss[0].append(
-            unsw_model.evaluate(X_unsw, X_unsw, batch_size=unsw_size, verbose=0))
+            unsw_model.evaluate(X_unsw, X_unsw, unsw_size, verbose=0))
         encoder_loss[1].append(
-            nsl_model.evaluate(X_nsl, X_nsl, batch_size=nsl_size, verbose=0))
+            nsl_model.evaluate(X_nsl, X_nsl, nsl_size, verbose=0))
 
-        nsl_model.fit(X_nsl, X_nsl, epochs=1, batch_size=batch_size)
+        nsl_model.fit(X_nsl, X_nsl, batch_size, epochs=1)
         encoder_loss[0].append(
-            unsw_model.evaluate(X_unsw, X_unsw, batch_size=unsw_size, verbose=0))
+            unsw_model.evaluate(X_unsw, X_unsw, unsw_size, verbose=0))
         encoder_loss[1].append(
-            nsl_model.evaluate(X_nsl, X_nsl, batch_size=nsl_size, verbose=0))
+            nsl_model.evaluate(X_nsl, X_nsl, nsl_size, verbose=0))
 
     print(encoder_loss[0])
     print(encoder_loss[1])
@@ -258,15 +247,15 @@ def supervised_shared(unsw_dict, nsl_dict, H1, U, num_epochs, batch_size, beta):
 
 
 def run_master(unsw_dict, nsl_dict, H1, U):
-    num_epochs = 4
-    batch_size = 128
+    num_epochs = 12
+    batch_size = 100
     beta = 0.01
     multicore_session()
     logger.info('Network config: %s %s %s %s for %d train epochs and %d batch'
                 % (H1, U, U, H1, num_epochs, batch_size))
     part1 = dict()
-    # part1 = supervised_single(unsw_dict, nsl_dict, H1, U,
-                              # num_epochs, batch_size, beta)
+    part1 = supervised_single(unsw_dict, nsl_dict, H1, U,
+                              num_epochs, batch_size, beta)
     part2 = supervised_shared(unsw_dict, nsl_dict, H1, U,
                               num_epochs, batch_size, beta)
     return dict(part1, **part2)
@@ -285,9 +274,8 @@ if __name__ == '__main__':
     unsw_dict = process_unsw(root_dir)
     nsl_dict = process_nsl(root_dir)
 
-    # layer_sizes = [128, 240, 320, 400]
-    layer_sizes = [400]
-    num_runs = 1
+    layer_sizes = [720]
+    num_runs = 6
     mult = 2
     results = []
     for H1 in layer_sizes:
