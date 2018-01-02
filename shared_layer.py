@@ -252,23 +252,23 @@ def run_main(unsw_hidden, nsl_hidden):
     shared['nsl_loss'].append(nsl_loss)
 
     score = m1.evaluate(X_unsw, y_unsw, y_unsw.shape[0], verbose=0)
-    logger.debug('UNSW train loss %.6f' % score[0])
-    logger.info('UNSW train accu %.6f' % score[1])
+    logger.debug('shared[unsw] train loss %.6f' % score[0])
+    logger.info('shared[unsw] train accu %.6f' % score[1])
     shared['unsw']['train'].append(score[1])
     score = m1.evaluate(X_unsw_test, y_unsw_test, y_unsw_test.shape[0],
                         verbose=0)
-    logger.debug('UNSW test loss %.6f' % score[0])
-    logger.info('UNSW test accu %.6f' % score[1])
+    logger.debug('shared[unsw] test loss %.6f' % score[0])
+    logger.info('shared[unsw] test accu %.6f' % score[1])
     shared['unsw']['test'].append(score[1])
 
     score = m2.evaluate(X_nsl, y_nsl, y_nsl.shape[0], verbose=0)
-    logger.debug('NSL train loss %.6f' % score[0])
-    logger.info('NSL train accu %.6f' % score[1])
+    logger.debug('shared[nsl] train loss %.6f' % score[0])
+    logger.info('shared[nsl] train accu %.6f' % score[1])
     shared['nsl']['train'].append(score[1])
     score = m2.evaluate(X_nsl_test, y_nsl_test, y_nsl_test.shape[0],
                         verbose=0)
-    logger.debug('NSL test loss %.6f' % score[0])
-    logger.info('NSL test accu %.6f' % score[1])
+    logger.debug('shared[nsl] test loss %.6f' % score[0])
+    logger.info('shared[nsl] test accu %.6f' % score[1])
     shared['nsl']['test'].append(score[1])
 
 
