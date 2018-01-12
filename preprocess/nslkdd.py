@@ -135,57 +135,58 @@ attack_category_map = {'normal': 'normal', 'back': 'dos',
 label_names = ['normal', 'probe', 'dos', 'u2r', 'r2l']
 category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
+enc = OneHotEncoder()
 
 
-def load_traffic(filename, encoder_fitted, traffic_map=category_map,
-                 one_hot_encode=True, show=6):
+def load_traffic(filename, encoder_fitted, traffic_map, one_hot_encode, show=6):
+    global enc
     """Each row  of all_traffic is a traffic record"""
     numerical_features = list()
     symbolic_features = list()
     labels = list()
 
-    with open(filename, 'rb') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        seen = set()
-        header = True
-        for row in reader:
-            if header:
-                header = False  # Skip feature names/header
-                continue
-            try:
-                # Ignore difficulty level
-                row = row[:-1]
-                attack = row[-1]
-                row = row[0:-1]
-                row[1] = protocol_types[row[1]]
-                row[2] = service_types[row[2]]
-                row[3] = flag_types[row[3]]
-                row[6] = land_types[row[6]]
-                row[11] = login_types[row[11]]
-                row[20] = host_login_types[row[20]]
-                row[21] = guest_login_types[row[21]]
-                # Ignore the 19th feature, which is a constant zero
-                numerical_features.append(row[0:1] + row[4:6] + row[7:11] +
-                                          row[12:19] + row[22:41])
-                symbolic_features.append(row[1:4] + row[6:7] + row[11:12] +
-                                         row[20:22])
+    csv_file = open(filename, 'rb')
+    reader = csv.reader(csv_file, delimiter=',')
+    seen = set()
+    header = True
+    for row in reader:
+        if header:
+            header = False  # Skip feature names/header
+            continue
+        try:
+            # Ignore difficulty level
+            row = row[:-1]
+            attack = row[-1]
+            row = row[0:-1]
+            row[1] = protocol_types[row[1]]
+            row[2] = service_types[row[2]]
+            row[3] = flag_types[row[3]]
+            row[6] = land_types[row[6]]
+            row[11] = login_types[row[11]]
+            row[20] = host_login_types[row[20]]
+            row[21] = guest_login_types[row[21]]
+            # Ignore the 19th feature, which is a constant zero
+            numerical_features.append(row[0:1] + row[4:6] + row[7:11] +
+                                      row[12:19] + row[22:41])
+            symbolic_features.append(row[1:4] + row[6:7] + row[11:12] +
+                                     row[20:22])
 
-                category = attack_category_map[attack]
-                labels.append(traffic_map[category])
+            category = attack_category_map[attack]
+            labels.append(traffic_map[category])
 
-                if category not in seen and show > 0:
-                    print(category, ' traffic')
-                    show -= 1
-                    seen.add(category)
-            except KeyError as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                print('Cannot parse %s at line %d' % (e, exc_tb.tb_lineno))
+            if category not in seen and show > 0:
+                print(category, ' traffic')
+                show -= 1
+                seen.add(category)
+        except KeyError as e:
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            print('Cannot parse %s at line %d' % (e, exc_tb.tb_lineno))
 
     part1 = np.array(numerical_features, dtype=float)
     print('Numeric feature size: ', part1.shape[1])
 
-    if one_hot_encoding is True:
-        if encoder_fitted is False:
+    if one_hot_encoding:
+        if not encoder_fitted:
             enc = OneHotEncoder()
             enc.fit(symbolic_features)
 
@@ -195,7 +196,7 @@ def load_traffic(filename, encoder_fitted, traffic_map=category_map,
         print('Symbolic feature sizes: ', enc.n_values_, part2.shape)
     else:
         part2 = np.array(symbolic_features, dtype=float)
-        print('Symbolic feature sizes: ', part2.shape)
+        print('Not OHEed Symbolic feature sizes: ', part2.shape)
 
     all_traffics = np.concatenate((part1, part2), axis=1)
     labels = np.array(labels, dtype=int)[np.newaxis]
@@ -292,7 +293,7 @@ def generate_valid_test_dataset(dataset, labels, dist, percent=0.1, root=''):
     maybe_npsave(root + 'NSLKDD/valid_labels', valid_label)
 
 
-def generate_datasets(binary_label, one_hot_encoding=False, root=''):
+def generate_dataset(binary_label, one_hot_encoding, root=''):
     global num_classes
     train = 'NSLKDD/KDDTrain.csv'
     if binary_label:
@@ -302,7 +303,8 @@ def generate_datasets(binary_label, one_hot_encoding=False, root=''):
                                          binary_map, one_hot_encoding)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(train, False, one_hot_encoding)
+        data_matrix, dist = load_traffic(train, False,
+                                         category_map, one_hot_encoding)
 
     dataset, labels = shuffle_dataset_with_label(data_matrix)
     generate_train_dataset(dataset, labels, root)
@@ -315,7 +317,8 @@ def generate_datasets(binary_label, one_hot_encoding=False, root=''):
                                          binary_map, one_hot_encoding)
     else:
         num_classes = len(category_map)
-        data_matrix, dist = load_traffic(test, True, one_hot_encoding)
+        data_matrix, dist = load_traffic(test, True,
+                                         category_map, one_hot_encoding)
 
     dataset, labels = split_dataset_with_label(data_matrix)
     generate_valid_test_dataset(dataset, labels, dist, root=root)
@@ -416,5 +419,5 @@ def discovery_feature_volcabulary(filenames, verbose=True):
 if __name__ == '__main__':
     np.set_printoptions(precision=4)
     binary_label = False
-    generate_datasets(binary_label)
-    # generate_datasets()
+    generate_dataset(binary_label)
+    # generate_dataset()
