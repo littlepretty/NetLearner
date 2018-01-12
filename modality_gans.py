@@ -1,21 +1,20 @@
 from __future__ import print_function, division
-
-# from keras.datasets import mnist
 from keras.layers import Input, Dense, Dropout
 from keras.layers import BatchNormalization, Activation
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam, SGD
+from keras.backend import tensorflow_backend as K
 # from preprocess import unsw, nslkdd
 
 import matplotlib.pyplot as plt
-# import sys
+import tensorflow as tf
 import numpy as np
-
+import pickle
 
 dopt = Adam(lr=1e-4)
-gopt = Adam(lr=1e-4)
-vopt = SGD(lr=1e-4, momentum=0.9)
+gopt = SGD(lr=1e-4)
+vopt = Adam(lr=1e-4)
 
 
 class ModGAN():
@@ -40,19 +39,18 @@ class ModGAN():
 
         valid1_u = self.discriminator1(u)
         valid2_u = self.discriminator2(u)
-
-        valid1_v = self.discriminator1(v)
-        valid2_v = self.discriminator2(v)
-
         self.combined1 = Model(inputs=z1, outputs=[valid1_u, valid2_u],
                                name='GAN_unsw')
         self.combined1.compile(vopt, 'categorical_crossentropy',
-                               metrics=['accuracy'], loss_weights=[0.2, 1.0])
+                               metrics=['accuracy'], loss_weights=[.2, 1.])
         self.combined1.summary()
+
+        valid1_v = self.discriminator1(v)
+        valid2_v = self.discriminator2(v)
         self.combined2 = Model(inputs=z2, outputs=[valid1_v, valid2_v],
                                name='GAN_nsl')
         self.combined2.compile(vopt, 'categorical_crossentropy',
-                               metrics=['accuracy'], loss_weights=[0.2, 1.0])
+                               metrics=['accuracy'], loss_weights=[1., .2])
         self.combined2.summary()
 
     def build_generator(self, feature_dim, input_name):
@@ -114,6 +112,27 @@ class ModGAN():
             for layer in net.layers:
                 layer.trainable = val
 
+        def plot_hist_accu(idx):
+            plt.figure(0)
+            plt.plot(history['d1_loss'], 'r--', label='d1_loss')
+            plt.plot(history['d2_loss'], 'r:', label='d2_loss')
+            plt.plot(history['g1_loss'], 'b--', label='g1_loss')
+            plt.plot(history['g2_loss'], 'g--', label='g2_loss')
+            plt.legend()
+            plt.savefig(self.root + 'hist_%d.pdf' % idx, format='pdf')
+            plt.clf()
+
+            plt.figure(1)
+            plt.plot(history['d1_accu'], 'r--', label='d1_accu')
+            plt.plot(history['d2_accu'], 'r:', label='d2_accu')
+            plt.plot(history['g1_accu1'], 'b--', label='g1_accu1')
+            plt.plot(history['g1_accu2'], 'b:', label='g1_accu2')
+            plt.plot(history['g2_accu1'], 'g--', label='g2_accu1')
+            plt.plot(history['g2_accu2'], 'g:', label='g2_accu2')
+            plt.legend()
+            plt.savefig(self.root + 'accu_%d.pdf' % idx, format='pdf')
+            plt.clf()
+
         for i in range(epochs):
             idx1 = np.random.randint(0, self.X1.shape[0], batch_size)
             batch1 = self.X1[idx1]
@@ -135,7 +154,7 @@ class ModGAN():
             self.combined1.compile(vopt, 'categorical_crossentropy',
                                    metrics=['accuracy'], loss_weights=[.2, 1.])
             self.combined2.compile(vopt, 'categorical_crossentropy',
-                                   metrics=['accuracy'], loss_weights=[.2, 1.])
+                                   metrics=['accuracy'], loss_weights=[1., .2])
             g1_score = self.combined1.train_on_batch(batch1, [y, y])
             g2_score = self.combined2.train_on_batch(batch2, [y, y])
             make_trainable(self.discriminator1, True)
@@ -165,30 +184,19 @@ class ModGAN():
                                           g1_score))
                 print('G2D1D2 %s = %s' % (self.combined2.metrics_names,
                                           g2_score))
+                plot_hist_accu(i)
 
-        plt.figure(0)
-        plt.plot(history['d1_loss'], 'r--', label='d1_loss')
-        plt.plot(history['d2_loss'], 'r:', label='d2_loss')
-        plt.plot(history['g1_loss'], 'b--', label='g1_loss')
-        plt.plot(history['g2_loss'], 'g--', label='g2_loss')
-        plt.legend()
-        plt.savefig(self.root + 'history.pdf', format='pdf')
-
-        plt.figure(1)
-        plt.plot(history['d1_accu'], 'r--', label='d1_accu')
-        plt.plot(history['d2_accu'], 'r:', label='d2_accu')
-        plt.plot(history['g1_accu1'], 'b--', label='g1_accu1')
-        plt.plot(history['g1_accu2'], 'b:', label='g1_accu2')
-        plt.plot(history['g2_accu1'], 'g--', label='g2_accu1')
-        plt.plot(history['g2_accu2'], 'g:', label='g2_accu2')
-        plt.legend()
-        plt.savefig(self.root + 'accu.pdf', format='pdf')
-        print(history['d1_accu'])
-        print(history['d2_accu'])
-        print(history['g1_accu1'])
-        print(history['g2_accu1'])
+        plot_hist_accu(epochs)
+        u = self.generator1.predict(self.X1)
+        v = self.generator2.predict(self.X2)
+        result = {'u': u, 'v': v, 'history': history}
+        filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim, epochs)
+        output = open(filename, 'wb+')
+        pickle.dump(result, output)
+        output.close()
 
 
 if __name__ == '__main__':
+    multicore_session()
     modgan = ModGAN()
-    modgan.train(60000)
+    modgan.train(60)
