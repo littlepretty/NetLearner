@@ -4,11 +4,10 @@ from keras.layers import BatchNormalization, Activation
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from keras.optimizers import Adam, SGD
-from keras.backend import tensorflow_backend as K
 # from preprocess import unsw, nslkdd
 
 import matplotlib.pyplot as plt
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 import pickle
 
@@ -91,7 +90,9 @@ class ModGAN():
         # discriminator.summary()
         return discriminator
 
-    def train(self, epochs, batch_size=128, show_interval=50):
+    def train(self, epochs, batch_size=100):
+        show_interval = 100
+        store_interval = 50
         history = {'d1_loss': [], 'd1_accu': [],
                    'd2_loss': [], 'd2_accu': [],
                    'g1_loss': [], 'g1_accu1': [], 'g1_accu2': [],
@@ -112,7 +113,23 @@ class ModGAN():
             for layer in net.layers:
                 layer.trainable = val
 
+        def store_history():
+            history['d1_loss'].append(d1_score[0])
+            history['d2_loss'].append(d2_score[0])
+            history['d1_accu'].append(d1_score[1])
+            history['d2_accu'].append(d2_score[1])
+            history['g1_loss'].append(g1_score[0])
+            history['g2_loss'].append(g2_score[0])
+            history['g1_accu1'].append(g1_score[3])
+            history['g2_accu1'].append(g2_score[3])
+            history['g1_accu2'].append(g1_score[4])
+            history['g2_accu2'].append(g2_score[4])
+
         def plot_hist_accu(idx):
+            print('D1 %s = %s' % (self.discriminator1.metrics_names, d1_score))
+            print('D2 %s = %s' % (self.discriminator2.metrics_names, d2_score))
+            print('G1D1D2 %s = %s' % (self.combined1.metrics_names, g1_score))
+            print('G2D1D2 %s = %s' % (self.combined2.metrics_names, g2_score))
             plt.figure(0)
             plt.plot(history['d1_loss'], 'r--', label='d1_loss')
             plt.plot(history['d2_loss'], 'r:', label='d2_loss')
@@ -165,25 +182,10 @@ class ModGAN():
             # print('%s == %s' % (t1_score[0], temp1[0]))
             # print('%s == %s' % (t2_score[0], temp2[0]))
 
-            history['d1_loss'].append(d1_score[0])
-            history['d2_loss'].append(d2_score[0])
-            history['d1_accu'].append(d1_score[1])
-            history['d2_accu'].append(d2_score[1])
-            history['g1_loss'].append(g1_score[0])
-            history['g2_loss'].append(g2_score[0])
-            history['g1_accu1'].append(g1_score[3])
-            history['g2_accu1'].append(g2_score[3])
-            history['g1_accu2'].append(g1_score[4])
-            history['g2_accu2'].append(g2_score[4])
+            if i % store_interval == 0:
+                store_history()
+
             if i % show_interval == 0:
-                print('D1 %s = %s' % (self.discriminator1.metrics_names,
-                                      d1_score))
-                print('D2 %s = %s' % (self.discriminator2.metrics_names,
-                                      d2_score))
-                print('G1D1D2 %s = %s' % (self.combined1.metrics_names,
-                                          g1_score))
-                print('G2D1D2 %s = %s' % (self.combined2.metrics_names,
-                                          g2_score))
                 plot_hist_accu(i)
 
         plot_hist_accu(epochs)
@@ -197,6 +199,5 @@ class ModGAN():
 
 
 if __name__ == '__main__':
-    multicore_session()
     modgan = ModGAN()
-    modgan.train(60)
+    modgan.train(1600)
