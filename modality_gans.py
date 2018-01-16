@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 # import tensorflow as tf
 import numpy as np
 import pickle
+# import pprint
 
 dopt = Adam(lr=1e-4)
 gopt = SGD(lr=1e-4)
@@ -18,9 +19,12 @@ vopt = Adam(lr=1e-4)
 
 class ModGAN():
     def __init__(self):
-        self.unified_dim = 640
+        self.unified_dim = 480
         self.root = 'ModalityGAN/'
-
+        self.hist = {'d1_loss': [], 'd1_accu': [],
+                     'd2_loss': [], 'd2_accu': [], 'steps': [],
+                     'g1_loss': [], 'g1_accu1': [], 'g1_accu2': [],
+                     'g2_loss': [], 'g2_accu1': [], 'g2_accu2': []}
         # unsw.generate_dataset(one_hot_encode=True, root_dir=self.root)
         self.X1 = np.load(self.root + 'UNSW/train_dataset.npy')
         # nslkdd.generate_dataset(True, True, root=self.root)
@@ -53,18 +57,18 @@ class ModGAN():
         self.combined2.summary()
 
     def build_generator(self, feature_dim, input_name):
-        hidden = [320, 512, self.unified_dim]
+        hidden = [640, self.unified_dim]
         input_layer = Input(shape=(feature_dim, ), name=input_name)
         H = BatchNormalization()(input_layer)
         H = Dense(hidden[0])(H)
         H = LeakyReLU(alpha=0.2)(H)
 
-        H = BatchNormalization()(H)
-        H = Dense(hidden[1])(H)
-        H = LeakyReLU(alpha=0.2)(H)
+        # H = BatchNormalization()(H)
+        # H = Dense(hidden[1])(H)
+        # H = LeakyReLU(alpha=0.2)(H)
 
         H = BatchNormalization()(H)
-        H = Dense(hidden[2])(H)
+        H = Dense(hidden[1])(H)
         V = Activation('sigmoid')(H)
         generator = Model(input_layer, V, name='G_' + input_name)
         generator.compile(dopt, 'binary_crossentropy')
@@ -93,10 +97,6 @@ class ModGAN():
     def train(self, epochs, batch_size=100):
         show_interval = 100
         store_interval = 50
-        history = {'d1_loss': [], 'd1_accu': [],
-                   'd2_loss': [], 'd2_accu': [],
-                   'g1_loss': [], 'g1_accu1': [], 'g1_accu2': [],
-                   'g2_loss': [], 'g2_accu1': [], 'g2_accu2': []}
         """Labels for D1"""
         y1 = np.zeros([2 * batch_size, 2])
         y1[0: batch_size, 1] = 1
@@ -113,44 +113,7 @@ class ModGAN():
             for layer in net.layers:
                 layer.trainable = val
 
-        def store_history():
-            history['d1_loss'].append(d1_score[0])
-            history['d2_loss'].append(d2_score[0])
-            history['d1_accu'].append(d1_score[1])
-            history['d2_accu'].append(d2_score[1])
-            history['g1_loss'].append(g1_score[0])
-            history['g2_loss'].append(g2_score[0])
-            history['g1_accu1'].append(g1_score[3])
-            history['g2_accu1'].append(g2_score[3])
-            history['g1_accu2'].append(g1_score[4])
-            history['g2_accu2'].append(g2_score[4])
-
-        def plot_hist_accu(idx):
-            print('D1 %s = %s' % (self.discriminator1.metrics_names, d1_score))
-            print('D2 %s = %s' % (self.discriminator2.metrics_names, d2_score))
-            print('G1D1D2 %s = %s' % (self.combined1.metrics_names, g1_score))
-            print('G2D1D2 %s = %s' % (self.combined2.metrics_names, g2_score))
-            plt.figure(0)
-            plt.plot(history['d1_loss'], 'r--', label='d1_loss')
-            plt.plot(history['d2_loss'], 'r:', label='d2_loss')
-            plt.plot(history['g1_loss'], 'b--', label='g1_loss')
-            plt.plot(history['g2_loss'], 'g--', label='g2_loss')
-            plt.legend()
-            plt.savefig(self.root + 'hist_%d.pdf' % idx, format='pdf')
-            plt.clf()
-
-            plt.figure(1)
-            plt.plot(history['d1_accu'], 'r--', label='d1_accu')
-            plt.plot(history['d2_accu'], 'r:', label='d2_accu')
-            plt.plot(history['g1_accu1'], 'b--', label='g1_accu1')
-            plt.plot(history['g1_accu2'], 'b:', label='g1_accu2')
-            plt.plot(history['g2_accu1'], 'g--', label='g2_accu1')
-            plt.plot(history['g2_accu2'], 'g:', label='g2_accu2')
-            plt.legend()
-            plt.savefig(self.root + 'accu_%d.pdf' % idx, format='pdf')
-            plt.clf()
-
-        for i in range(epochs):
+        for i in range(epochs + 1):
             idx1 = np.random.randint(0, self.X1.shape[0], batch_size)
             batch1 = self.X1[idx1]
             idx2 = np.random.randint(0, self.X2.shape[0], batch_size)
@@ -176,26 +139,64 @@ class ModGAN():
             g2_score = self.combined2.train_on_batch(batch2, [y, y])
             make_trainable(self.discriminator1, True)
             make_trainable(self.discriminator2, True)
-            # temp1 = self.discriminator1.test_on_batch(X, y1)
-            # temp2 = self.discriminator2.test_on_batch(X, y2)
-            """Make sure D1/D2 are not updated when training G1/G2"""
-            # print('%s == %s' % (t1_score[0], temp1[0]))
-            # print('%s == %s' % (t2_score[0], temp2[0]))
-
+            """Make sure D1/D2 are not updated when training G1/G2
+            temp1 = self.discriminator1.test_on_batch(X, y1)
+            temp2 = self.discriminator2.test_on_batch(X, y2)
+            print('%s == %s' % (t1_score[0], temp1[0]))
+            print('%s == %s' % (t2_score[0], temp2[0]))
+            """
             if i % store_interval == 0:
-                store_history()
+                self.store_history(i, d1_score, d2_score, g1_score, g2_score)
 
             if i % show_interval == 0:
-                plot_hist_accu(i)
+                self.plot_hist_accu(i, d1_score, d2_score, g1_score, g2_score)
 
-        plot_hist_accu(epochs)
-        u = self.generator1.predict(self.X1)
-        v = self.generator2.predict(self.X2)
-        result = {'u': u, 'v': v, 'history': history}
+        UX1 = self.generator1.predict(self.X1)
+        UX2 = self.generator2.predict(self.X2)
+        result = {'unsw': UX1, 'nsl': UX2, 'history': self.hist}
         filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim, epochs)
         output = open(filename, 'wb+')
         pickle.dump(result, output)
         output.close()
+
+    def store_history(self, idx, d1_score, d2_score, g1_score, g2_score):
+        self.hist['steps'].append(idx)
+        self.hist['d1_loss'].append(d1_score[0])
+        self.hist['d2_loss'].append(d2_score[0])
+        self.hist['d1_accu'].append(d1_score[1])
+        self.hist['d2_accu'].append(d2_score[1])
+        self.hist['g1_loss'].append(g1_score[0])
+        self.hist['g2_loss'].append(g2_score[0])
+        self.hist['g1_accu1'].append(g1_score[3])
+        self.hist['g2_accu1'].append(g2_score[3])
+        self.hist['g1_accu2'].append(g1_score[4])
+        self.hist['g2_accu2'].append(g2_score[4])
+
+    def plot_hist_accu(self, idx, d1_score, d2_score, g1_score, g2_score):
+        print('D1 %s = %s' % (self.discriminator1.metrics_names, d1_score))
+        print('D2 %s = %s' % (self.discriminator2.metrics_names, d2_score))
+        print('G1D1D2 %s = %s' % (self.combined1.metrics_names, g1_score))
+        print('G2D1D2 %s = %s' % (self.combined2.metrics_names, g2_score))
+        steps = self.hist['steps']
+        plt.figure(0)
+        plt.plot(steps, self.hist['d1_loss'], 'r--', label='d1_loss')
+        plt.plot(steps, self.hist['d2_loss'], 'm:', label='d2_loss')
+        plt.plot(steps, self.hist['g1_loss'], 'b--', label='g1_loss')
+        plt.plot(steps, self.hist['g2_loss'], 'g:', label='g2_loss')
+        plt.legend()
+        plt.savefig(self.root + 'loss_%d.pdf' % idx, format='pdf')
+        plt.close()
+
+        plt.figure(1)
+        plt.plot(steps, self.hist['d1_accu'], 'r--', label='d1_accu')
+        plt.plot(steps, self.hist['d2_accu'], 'm:', label='d2_accu')
+        plt.plot(steps, self.hist['g1_accu1'], 'b--', label='g1_accu1')
+        plt.plot(steps, self.hist['g1_accu2'], 'b:', label='g1_accu2')
+        plt.plot(steps, self.hist['g2_accu1'], 'g--', label='g2_accu1')
+        plt.plot(steps, self.hist['g2_accu2'], 'g:', label='g2_accu2')
+        plt.legend()
+        plt.savefig(self.root + 'accu_%d.pdf' % idx, format='pdf')
+        plt.close()
 
 
 if __name__ == '__main__':
