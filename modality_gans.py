@@ -1,35 +1,38 @@
 from __future__ import print_function, division
 from keras.layers import Input, Dense, Dropout
-from keras.layers import BatchNormalization, Activation
-from keras.layers.advanced_activations import LeakyReLU
-from keras.models import Model
+from keras.layers import BatchNormalization
+# from keras.layers.advanced_activations import LeakyReLU
+from keras.models import Model, load_model
 from keras.optimizers import Adam, SGD
 # from preprocess import unsw, nslkdd
-
 import matplotlib.pyplot as plt
 # import tensorflow as tf
 import numpy as np
 import pickle
-# import pprint
-
-dopt = Adam(lr=1e-4)
-gopt = SGD(lr=1e-4)
-vopt = Adam(lr=1e-4)
 
 
 class ModGAN():
-    def __init__(self):
-        self.unified_dim = 480
+    def __init__(self, resume=False, hist_filename=None):
         self.root = 'ModalityGAN/'
-        self.hist = {'d1_loss': [], 'd1_accu': [],
-                     'd2_loss': [], 'd2_accu': [], 'steps': [],
-                     'g1_loss': [], 'g1_accu1': [], 'g1_accu2': [],
-                     'g2_loss': [], 'g2_accu1': [], 'g2_accu2': []}
+        self.unified_dim = 320
         # unsw.generate_dataset(one_hot_encode=True, root_dir=self.root)
         self.X1 = np.load(self.root + 'UNSW/train_dataset.npy')
         # nslkdd.generate_dataset(True, True, root=self.root)
         self.X2 = np.load(self.root + 'NSLKDD/train_dataset.npy')
 
+        if resume is False:
+            self.build_all_models()
+            self.hist = {'d1_loss': [], 'd1_accu': [],
+                         'd2_loss': [], 'd2_accu': [], 'steps': [],
+                         'g1_loss': [], 'g1_accu1': [], 'g1_accu2': [],
+                         'g2_loss': [], 'g2_accu1': [], 'g2_accu2': []}
+        else:
+            self.load_models()
+            self.combined1.summary()
+            self.combined2.summary()
+            self.hist = self.load_history(hist_filename)
+
+    def build_all_models(self):
         self.discriminator1 = self.build_discriminator('D1')
         self.discriminator2 = self.build_discriminator('D2')
         self.generator1 = self.build_generator(self.X1.shape[1], 'unsw')
@@ -57,34 +60,35 @@ class ModGAN():
         self.combined2.summary()
 
     def build_generator(self, feature_dim, input_name):
-        hidden = [640, self.unified_dim]
+        hidden = [640, 480, self.unified_dim]
         input_layer = Input(shape=(feature_dim, ), name=input_name)
         H = BatchNormalization()(input_layer)
-        H = Dense(hidden[0])(H)
-        H = LeakyReLU(alpha=0.2)(H)
-
-        # H = BatchNormalization()(H)
-        # H = Dense(hidden[1])(H)
+        H = Dense(hidden[0], activation='sigmoid')(H)
         # H = LeakyReLU(alpha=0.2)(H)
 
         H = BatchNormalization()(H)
-        H = Dense(hidden[1])(H)
-        V = Activation('sigmoid')(H)
+        H = Dense(hidden[1], activation='sigmoid')(H)
+        # H = LeakyReLU(alpha=0.2)(H)
+
+        H = BatchNormalization()(H)
+        V = Dense(hidden[2], activation='sigmoid')(H)
         generator = Model(input_layer, V, name='G_' + input_name)
         generator.compile(dopt, 'binary_crossentropy')
-        # generator.summary()
+        generator.summary()
         return generator
 
     def build_discriminator(self, model_name):
-        hidden = [self.unified_dim, 256, 2]
+        hidden = [256, 128, 2]
         drop_prob = 0.2
         input_layer = Input(shape=(self.unified_dim, ))
-        H = Dense(hidden[0])(input_layer)
-        H = LeakyReLU(alpha=0.2)(H)
+        H = BatchNormalization()(input_layer)
+        H = Dense(hidden[0], activation='relu')(H)
+        # H = LeakyReLU(alpha=0.2)(H)
         H = Dropout(drop_prob)(H)
 
-        H = Dense(hidden[1])(H)
-        H = LeakyReLU(alpha=0.2)(H)
+        H = BatchNormalization()(H)
+        H = Dense(hidden[1], activation='sigmoid')(H)
+        # H = LeakyReLU(alpha=0.2)(H)
         H = Dropout(drop_prob)(H)
 
         V = Dense(hidden[2], activation='softmax')(H)
@@ -94,9 +98,9 @@ class ModGAN():
         # discriminator.summary()
         return discriminator
 
-    def train(self, epochs, batch_size=100):
-        show_interval = 100
-        store_interval = 50
+    def train(self, num_steps, batch_size=100):
+        show_interval = max(1, num_steps / 10)
+        store_interval = max(1, num_steps // 100)
         """Labels for D1"""
         y1 = np.zeros([2 * batch_size, 2])
         y1[0: batch_size, 1] = 1
@@ -113,7 +117,11 @@ class ModGAN():
             for layer in net.layers:
                 layer.trainable = val
 
-        for i in range(epochs + 1):
+        init_step = 0
+        if len(self.hist['steps']) > 0:
+            init_step = self.hist['steps'][-1] + 1
+
+        for i in range(init_step, init_step + num_steps + 1):
             idx1 = np.random.randint(0, self.X1.shape[0], batch_size)
             batch1 = self.X1[idx1]
             idx2 = np.random.randint(0, self.X2.shape[0], batch_size)
@@ -151,12 +159,11 @@ class ModGAN():
             if i % show_interval == 0:
                 self.plot_hist_accu(i, d1_score, d2_score, g1_score, g2_score)
 
-        UX1 = self.generator1.predict(self.X1)
-        UX2 = self.generator2.predict(self.X2)
-        result = {'unsw': UX1, 'nsl': UX2, 'history': self.hist}
-        filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim, epochs)
-        output = open(filename, 'wb+')
-        pickle.dump(result, output)
+        self.checkpoint()
+        filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim,
+                                                  init_step + num_steps)
+        output = open(filename, 'wb')
+        pickle.dump(self.hist, output)
         output.close()
 
     def store_history(self, idx, d1_score, d2_score, g1_score, g2_score):
@@ -183,6 +190,7 @@ class ModGAN():
         plt.plot(steps, self.hist['d2_loss'], 'm:', label='d2_loss')
         plt.plot(steps, self.hist['g1_loss'], 'b--', label='g1_loss')
         plt.plot(steps, self.hist['g2_loss'], 'g:', label='g2_loss')
+        plt.grid(linestyle=':')
         plt.legend()
         plt.savefig(self.root + 'loss_%d.pdf' % idx, format='pdf')
         plt.close()
@@ -194,11 +202,41 @@ class ModGAN():
         plt.plot(steps, self.hist['g1_accu2'], 'b:', label='g1_accu2')
         plt.plot(steps, self.hist['g2_accu1'], 'g--', label='g2_accu1')
         plt.plot(steps, self.hist['g2_accu2'], 'g:', label='g2_accu2')
+        plt.grid(linestyle=':')
         plt.legend()
         plt.savefig(self.root + 'accu_%d.pdf' % idx, format='pdf')
         plt.close()
 
+    def checkpoint(self):
+        self.generator1.save(self.root + 'generator1.h5')
+        self.generator2.save(self.root + 'generator2.h5')
+        self.discriminator1.save(self.root + 'discriminator1.h5')
+        self.discriminator2.save(self.root + 'discriminator2.h5')
+        self.combined1.save(self.root + 'combined1.h5')
+        self.combined2.save(self.root + 'combined2.h5')
+
+    def load_models(self):
+        self.generator1 = load_model(self.root + 'generator1.h5')
+        self.generator2 = load_model(self.root + 'generator2.h5')
+        self.discriminator1 = load_model(self.root + 'discriminator1.h5')
+        self.discriminator2 = load_model(self.root + 'discriminator2.h5')
+        self.combined1 = load_model(self.root + 'combined1.h5')
+        self.combined2 = load_model(self.root + 'combined2.h5')
+
+    def load_history(self, hist_filename):
+        f = open(self.root + hist_filename, 'rb')
+        hist = pickle.load(f)
+        f.close()
+        return hist
+
 
 if __name__ == '__main__':
-    modgan = ModGAN()
-    modgan.train(1600)
+    dopt = SGD(lr=4e-4, momentum=0.9)
+    gopt = Adam(lr=4e-4)
+    vopt = SGD(lr=4e-4, momentum=0.9)
+    n1, n2 = 600, 400
+    # modgan = ModGAN()
+    # modgan.train(n1)
+    pkl_file = 'U320Runs%d.pkl' % n1
+    modgan = ModGAN(True, pkl_file)
+    modgan.train(n2)
