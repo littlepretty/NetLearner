@@ -138,7 +138,7 @@ binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
 enc = OneHotEncoder()
 
 
-def load_traffic(filename, encoder_fitted, traffic_map, one_hot_encode, show=6):
+def load_traffic(filename, encoder_fitted, traffic_map, ohe, show=6):
     global enc
     """Each row  of all_traffic is a traffic record"""
     numerical_features = list()
@@ -185,7 +185,7 @@ def load_traffic(filename, encoder_fitted, traffic_map, one_hot_encode, show=6):
     part1 = np.array(numerical_features, dtype=float)
     print('Numeric feature size: ', part1.shape[1])
 
-    if one_hot_encoding:
+    if ohe is True:
         if not encoder_fitted:
             enc = OneHotEncoder()
             enc.fit(symbolic_features)
@@ -419,5 +419,5 @@ def discovery_feature_volcabulary(filenames, verbose=True):
 if __name__ == '__main__':
     np.set_printoptions(precision=4)
     binary_label = False
-    generate_dataset(binary_label)
+    generate_dataset(binary_label, False)
     # generate_dataset()

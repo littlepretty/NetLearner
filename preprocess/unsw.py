@@ -270,11 +270,13 @@ def generate_dataset(one_hot_encode=True, root_dir=''):
 
 if __name__ == '__main__':
     # generate_dataset(True)
-    # generate_dataset(False)
+    generate_dataset(False)
+    """
     filenames = ['UNSW/UNSW_NB15_%s-set.csv' % x
                  for x in ['training', 'testing']]
-    # discovery_category_map(filenames)
+    discovery_category_map(filenames)
     filename = 'UNSW/feature_names_train_test.csv'
     discovery_feature_volcabulary(filenames)
     headers, _, _, dnames = get_feature_names(filename)
     discovery_discrete_range(filenames, dnames, headers)
+    """
