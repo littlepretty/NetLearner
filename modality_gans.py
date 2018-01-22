@@ -5,6 +5,7 @@ from keras.layers import BatchNormalization
 from keras.models import Model, load_model
 from keras.optimizers import Adam, SGD
 # from preprocess import unsw, nslkdd
+from memory_profiler import profile
 import matplotlib.pyplot as plt
 # import tensorflow as tf
 import numpy as np
@@ -48,7 +49,7 @@ class ModGAN():
         self.combined1 = Model(inputs=z1, outputs=[valid1_u, valid2_u],
                                name='GAN_unsw')
         self.combined1.compile(vopt, 'categorical_crossentropy',
-                               metrics=['accuracy'], loss_weights=[.2, 1.])
+                               metrics=['accuracy'], loss_weights=[.5, .5])
         self.combined1.summary()
 
         valid1_v = self.discriminator1(v)
@@ -56,7 +57,7 @@ class ModGAN():
         self.combined2 = Model(inputs=z2, outputs=[valid1_v, valid2_v],
                                name='GAN_nsl')
         self.combined2.compile(vopt, 'categorical_crossentropy',
-                               metrics=['accuracy'], loss_weights=[1., .2])
+                               metrics=['accuracy'], loss_weights=[.5, .5])
         self.combined2.summary()
 
     def build_generator(self, feature_dim, input_name):
@@ -98,6 +99,11 @@ class ModGAN():
         # discriminator.summary()
         return discriminator
 
+    def make_trainable(self, net, val):
+        for layer in net.layers:
+            layer.trainable = val
+
+    @profile
     def train(self, num_steps, batch_size=100):
         show_interval = max(1, num_steps / 10)
         store_interval = max(1, num_steps // 100)
@@ -113,40 +119,36 @@ class ModGAN():
         y = np.zeros([batch_size, 2])
         y[:, 1] = 1
 
-        def make_trainable(net, val):
-            for layer in net.layers:
-                layer.trainable = val
-
         init_step = 0
         if len(self.hist['steps']) > 0:
             init_step = self.hist['steps'][-1] + 1
 
-        for i in range(init_step, init_step + num_steps + 1):
+        for i in xrange(init_step, init_step + num_steps + 1):
             idx1 = np.random.randint(0, self.X1.shape[0], batch_size)
             batch1 = self.X1[idx1]
             idx2 = np.random.randint(0, self.X2.shape[0], batch_size)
             batch2 = self.X2[idx2]
 
-            u = self.generator1.predict(batch1)
-            v = self.generator2.predict(batch2)
-            X = np.concatenate((u, v))
+            u = self.generator1.predict(batch1, batch_size)
+            v = self.generator2.predict(batch2, batch_size)
+            X = np.concatenate((u, v), axis=0)
 
             d1_score = self.discriminator1.train_on_batch(X, y1)
             d2_score = self.discriminator2.train_on_batch(X, y2)
             # t1_score = self.discriminator1.test_on_batch(X, y1)
             # t2_score = self.discriminator2.test_on_batch(X, y2)
 
-            make_trainable(self.discriminator1, False)
-            make_trainable(self.discriminator2, False)
+            self.make_trainable(self.discriminator1, False)
+            self.make_trainable(self.discriminator2, False)
             """Train both G1 and G2 to fool D1/D2"""
             self.combined1.compile(vopt, 'categorical_crossentropy',
-                                   metrics=['accuracy'], loss_weights=[.2, 1.])
+                                   metrics=['accuracy'], loss_weights=[.5, .5])
             self.combined2.compile(vopt, 'categorical_crossentropy',
-                                   metrics=['accuracy'], loss_weights=[1., .2])
+                                   metrics=['accuracy'], loss_weights=[.5, .5])
             g1_score = self.combined1.train_on_batch(batch1, [y, y])
             g2_score = self.combined2.train_on_batch(batch2, [y, y])
-            make_trainable(self.discriminator1, True)
-            make_trainable(self.discriminator2, True)
+            self.make_trainable(self.discriminator1, True)
+            self.make_trainable(self.discriminator2, True)
             """Make sure D1/D2 are not updated when training G1/G2
             temp1 = self.discriminator1.test_on_batch(X, y1)
             temp2 = self.discriminator2.test_on_batch(X, y2)
@@ -160,11 +162,7 @@ class ModGAN():
                 self.plot_hist_accu(i, d1_score, d2_score, g1_score, g2_score)
 
         self.checkpoint()
-        filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim,
-                                                  init_step + num_steps)
-        output = open(filename, 'wb')
-        pickle.dump(self.hist, output)
-        output.close()
+        self.dump_history(init_step + num_steps)
 
     def store_history(self, idx, d1_score, d2_score, g1_score, g2_score):
         self.hist['steps'].append(idx)
@@ -229,14 +227,20 @@ class ModGAN():
         f.close()
         return hist
 
+    def dump_history(self, steps):
+        filename = self.root + 'U%dRuns%d.pkl' % (self.unified_dim, steps)
+        output = open(filename, 'wb')
+        pickle.dump(self.hist, output)
+        output.close()
+
 
 if __name__ == '__main__':
-    dopt = SGD(lr=4e-4, momentum=0.9)
-    gopt = Adam(lr=4e-4)
-    vopt = SGD(lr=4e-4, momentum=0.9)
+    dopt = Adam(lr=1e-4)
+    gopt = SGD(lr=4e-4)
+    vopt = Adam(lr=1e-4)
     n1, n2 = 600, 400
-    # modgan = ModGAN()
-    # modgan.train(n1)
-    pkl_file = 'U320Runs%d.pkl' % n1
-    modgan = ModGAN(True, pkl_file)
-    modgan.train(n2)
+    modgan = ModGAN()
+    modgan.train(n1)
+    # pkl_file = 'U320Runs%d.pkl' % n1
+    # modgan = ModGAN(True, pkl_file)
+    # modgan.train(n2)
