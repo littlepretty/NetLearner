@@ -43,7 +43,8 @@ def quantile_transform(X_train, X_valid, X_test, columns):
     t = QuantileTransformer()
     t.fit(X_train[:, columns])
     qX_train = t.transform(X_train[:, columns])
-    qX_valid = t.transform(X_valid[:, columns]) if X_valid is not None else None
+    qX_valid = t.transform(X_valid[:, columns]) \
+        if X_valid is not None else None
     qX_test = t.transform(X_test[:, columns]) if X_test is not None else None
     if X_valid is not None:
         X_train[:, columns] = qX_train
@@ -58,7 +59,8 @@ def augment_quantiled(X_train, X_valid, X_test, columns):
     t = QuantileTransformer()
     t.fit(X_train[:, columns])
     qX_train = t.transform(X_train[:, columns])
-    qX_valid = t.transform(X_valid[:, columns]) if X_valid is not None else None
+    qX_valid = t.transform(X_valid[:, columns]) \
+        if X_valid is not None else None
     qX_test = t.transform(X_test[:, columns]) if X_test is not None else None
     mX_train, mX_valid, mX_test = min_max_scale(X_train, X_valid, X_test)
     X_train = np.concatenate((mX_train, qX_train), axis=1)
@@ -97,11 +99,12 @@ def accuracy_binary(predictions, labels):
 
 
 def compute_classification_table(predictions, labels):
-    num_classes = labels.shape[1]
-    class_table = np.zeros((num_classes, num_classes))
-    predicted_class = np.argmax(predictions, 1)
-    actual_class = np.argmax(labels, 1)
-    for (a, p) in zip(actual_class, predicted_class):
+    n_cls = labels.shape[1]
+    class_table = np.zeros((n_cls, n_cls))
+    predicted_cls = np.argmax(predictions, 1)
+    actual_cls = np.argmax(labels, 1)
+
+    for (a, p) in zip(actual_cls, predicted_cls):
         class_table[a][p] += 1
 
     return class_table
@@ -171,7 +174,7 @@ def sample_prob_dist(prob, rand):
 
 
 def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
-    log = open(dirname + '/test.log', "a")
+    log = open(dirname + 'confusion_matrix.log', 'a')
     if labels.shape[1] == 5:
         log.write("***** 5-Class performance *****\n")
         accu = accuracy(predictions, labels)
@@ -182,6 +185,9 @@ def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
         if dataset_name == 'Test':
             log.write(tabulate(class_table, headers, tablefmt='latex') + '\n')
         log.write(correct_percentage(class_table) + '\n')
+        log.close()
+        return class_table
+
     elif labels.shape[1] == 2:
         log.write("***** 2-Class performance *****\n")
         accu_binary = accuracy_binary(predictions, labels)
@@ -195,6 +201,7 @@ def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
                                tablefmt='latex') + '\n')
         log.write(correct_percentage(binary_class_table, dataset_name) + '\n')
         log.close()
+        return binary_class_table
 
 
 def hyperparameter_summary(dirname, hyperparameter):
