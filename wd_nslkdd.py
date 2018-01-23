@@ -11,23 +11,33 @@ import logging
 import os
 from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from preprocess.nslkdd import get_feature_names, get_categorical_values
+from preprocess.nslkdd import attack_category_map
+from netlearner.utils import measure_prediction
 
 
 def build_model(model_dir, model_type):
-    hidden_layers = [256, 128, 64]
+    hidden_layers = [1024, 512, 256]
+    label_names = label_mapping.keys()
     if model_type == 'wide':
         m = tf.estimator.LinearClassifier(
             model_dir=model_dir, feature_columns=wide_columns)
     elif model_type == 'deep':
         m = tf.estimator.DNNClassifier(
-            model_dir=model_dir, feature_columns=deep_columns,
-            hidden_units=hidden_layers)
+            model_dir=model_dir,
+            feature_columns=deep_columns,
+            hidden_units=hidden_layers,
+            label_vocabulary=label_names,
+            dnn_dropout=dropout,
+            n_classes=len(label_names))
     else:
         m = tf.estimator.DNNLinearCombinedClassifier(
             model_dir=model_dir,
             linear_feature_columns=wide_columns,
             dnn_feature_columns=deep_columns,
-            dnn_hidden_units=hidden_layers, dnn_dropout=dropout)
+            dnn_hidden_units=hidden_layers,
+            label_vocabulary=label_names,
+            dnn_dropout=dropout,
+            n_classes=len(label_names))
 
     print('Hidden units in each layer:%s' % hidden_layers)
     return m
@@ -38,21 +48,13 @@ def augment_dataset(fname, output_path):
     df_data = pd.read_csv(tf.gfile.Open(fname), names=CSV_COLUMNS, sep=',',
                           skipinitialspace=True, engine='python', skiprows=1)
     data = df_data.drop('difficulty', axis=1)
-    labels = df_data['traffic'].apply(lambda x: x != 'normal').astype(int)
+    labels = df_data['traffic'].apply(lambda x: attack_category_map[x])
     data = data.drop('traffic', axis=1)
+
     print('Raw dataset shape', data.shape)
     print('Raw label shape', labels.shape)
 
     numeric = data[continuous_names + discrete_names].as_matrix()
-
-    if scaler_fitted:
-        print('Scaler already fitted')
-        numeric = scaler.transform(numeric)
-    else:
-        print('First time fit scaler')
-        scaler.fit(numeric)
-        numeric = scaler.transform(numeric)
-        scaler_fitted = True
 
     if transformer_fitted:
         print('Transformer already fitted')
@@ -62,6 +64,15 @@ def augment_dataset(fname, output_path):
         transformer.fit(numeric)
         augment = transformer.transform(numeric)
         transformer_fitted = True
+
+    if scaler_fitted:
+        print('Scaler already fitted')
+        numeric = scaler.transform(numeric)
+    else:
+        print('First time fit scaler')
+        scaler.fit(numeric)
+        numeric = scaler.transform(numeric)
+        scaler_fitted = True
 
     temp = np.concatenate((data.as_matrix(), augment), axis=1)
     columns = CSV_COLUMNS[:-2] + quantile_names
@@ -76,7 +87,11 @@ def input_builder(data_file, columns):
     df_data = pd.read_csv(tf.gfile.Open(data_file), names=columns,
                           sep=',', skipinitialspace=True,
                           engine='python', skiprows=1)
-    labels = df_data['label'].astype(int)
+    labels = df_data['label']
+    labels_ohe = np.zeros((labels.shape[0], len(label_mapping)))
+    for x in labels:
+        labels_ohe[label_mapping[x]] = 1.0
+
     dataset = df_data.drop('label', axis=1)
     dataset['land'] = dataset['land'].astype(str)
     dataset['login'] = dataset['login'].astype(str)
@@ -86,13 +101,13 @@ def input_builder(data_file, columns):
     # print('Label shape', labels.shape)
     ib = tf.estimator.inputs.pandas_input_fn(dataset, labels, batch_size,
                                              shuffle=True, num_threads=1)
-    return ib
+    return ib, labels_ohe
 
 
 def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
     m = build_model(model_dir, mtype)
-    train_ib = input_builder(train_filename, columns)
-    test_ib = input_builder(test_filename, columns)
+    train_ib, _ = input_builder(train_filename, columns)
+    test_ib, ohe = input_builder(test_filename, columns)
     history = {'train': [], 'test': []}
     for i in range(num_epochs):
         m.train(input_fn=train_ib)
@@ -107,6 +122,13 @@ def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
         logger.info('******   Test performance   ******')
         for key in results:
             logger.info("%s: %s" % (key, results[key]))
+
+    predictions = []
+    for x in m.predict(test_ib):
+        predictions.append(x['probabilities'])
+
+    conf_table = measure_prediction(np.array(predictions), ohe, model_dir)
+    history['confusion_table'] = conf_table
 
     return history
 
@@ -188,8 +210,9 @@ model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
 num_epochs = 160
-batch_size = 160
+batch_size = 40
 dropout = 0.2
+label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 
 scaler = MinMaxScaler()
 transformer = QuantileTransformer()
@@ -197,7 +220,7 @@ scaler_fitted = False
 transformer_fitted = False
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('ModalityNets')
+logger = logging.getLogger('WD')
 hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
 formatter = logging.Formatter('%(asctime)s %(message)s')
 hdlr.setFormatter(formatter)
@@ -205,7 +228,7 @@ logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
 
 columns = augment_dataset(train_filename, train_path)
-augment_dataset(test_filename, model_dir + 'aug_test.csv')
+augment_dataset(test_filename, test_path)
 hist = train_and_eval(model_dir, 'WnD', columns, train_path, test_path)
 output = open(model_dir + 'Runs%d.pkl' % (num_epochs), 'wb')
 pickle.dump(hist, output)
@@ -213,9 +236,17 @@ output.close()
 
 """
 model_dir = 'WideDeepModel/NSLKDD/'
-num_epochs = 320
-output = open(model_dir + 'Runs%d.pkl' % (num_epochs), 'rb')
-hist = pickle.load(output)
+epoch_list = [320, 160]
+num_epochs = 480
+hist = dict()
+for e in epoch_list:
+    output = open(model_dir + 'Runs%d.pkl' % e, 'rb')
+    temp = pickle.load(output)
+    for (key, value) in temp.items():
+        if key not in hist:
+            hist[key] = []
+
+        hist[key] += temp[key]
 """
 fig, ax1 = plt.subplots()
 ax1.plot([x['accuracy'] for x in hist['train']], 'r--')
@@ -232,11 +263,11 @@ plt.savefig(model_dir + 'accu_%d.pdf' % num_epochs, format='pdf')
 plt.close()
 
 fig, ax1 = plt.subplots()
-ax1.plot([x['loss'] for x in hist['train']], 'r--')
+ax1.plot([x['average_loss'] for x in hist['train']], 'r--')
 ax1.set_ylabel('train', color='r')
 ax1.tick_params('y', colors='r')
 ax2 = ax1.twinx()
-ax2.plot([x['loss'] for x in hist['test']], 'b:')
+ax2.plot([x['average_loss'] for x in hist['test']], 'b:')
 ax2.set_ylabel('test', color='b')
 ax2.tick_params('y', colors='b')
 ax1.grid(color='k', linestyle=':', linewidth=1)
