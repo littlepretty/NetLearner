@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pickle
 import logging
 import os
-from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
+from sklearn.preprocessing import MinMaxScaler
 from preprocess.nslkdd import get_feature_names, get_categorical_values
 from preprocess.nslkdd import attack_category_map
 from netlearner.utils import measure_prediction
@@ -43,7 +43,7 @@ def build_model(model_dir, model_type):
     return m
 
 
-def augment_dataset(fname, output_path):
+def process_dataset(fname, output_path):
     global scaler_fitted, transformer_fitted
     df_data = pd.read_csv(tf.gfile.Open(fname), names=CSV_COLUMNS, sep=',',
                           skipinitialspace=True, engine='python', skiprows=1)
@@ -55,7 +55,8 @@ def augment_dataset(fname, output_path):
     print('Raw label shape', labels.shape)
 
     numeric = data[continuous_names + discrete_names].as_matrix()
-
+    symbolic = data[symbolic_names].as_matrix()
+    """
     if transformer_fitted:
         print('Transformer already fitted')
         augment = transformer.transform(numeric)
@@ -64,7 +65,7 @@ def augment_dataset(fname, output_path):
         transformer.fit(numeric)
         augment = transformer.transform(numeric)
         transformer_fitted = True
-
+    """
     if scaler_fitted:
         print('Scaler already fitted')
         numeric = scaler.transform(numeric)
@@ -74,8 +75,8 @@ def augment_dataset(fname, output_path):
         numeric = scaler.transform(numeric)
         scaler_fitted = True
 
-    temp = np.concatenate((data.as_matrix(), augment), axis=1)
-    columns = CSV_COLUMNS[:-2] + quantile_names
+    temp = np.concatenate((symbolic, numeric), axis=1)
+    columns = symbolic_names + continuous_names + discrete_names
     combined = pd.DataFrame(temp, labels.index.tolist(), columns)
     save = pd.concat([combined, labels], axis=1)
     save.to_csv(output_path, index=False)
@@ -136,19 +137,14 @@ def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
     get_feature_names('NSLKDD/feature_names.csv')
-header = ""
-for name in CSV_COLUMNS:
-    header += name + ','
-
-print('Feature names: ', header)
 print(symbolic_names)
 print(continuous_names)
 print(discrete_names)
-
+"""
 quantile_names = []
 for name in continuous_names + discrete_names:
     quantile_names.append(name + '_quantile')
-
+"""
 # Build wide columns
 protocol = tf.feature_column.categorical_column_with_vocabulary_list(
     'protocol', get_categorical_values('protocol'))
@@ -197,7 +193,7 @@ embedding_columns = [
 ]
 # Build continous columns
 continuous_columns = []
-for name in continuous_names + discrete_names + quantile_names:
+for name in continuous_names + discrete_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns.append(column)
 
@@ -209,15 +205,13 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 160
+num_epochs = 120
 batch_size = 40
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 
 scaler = MinMaxScaler()
-transformer = QuantileTransformer()
 scaler_fitted = False
-transformer_fitted = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('WD')
@@ -227,8 +221,8 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
 
-columns = augment_dataset(train_filename, train_path)
-augment_dataset(test_filename, test_path)
+columns = process_dataset(train_filename, train_path)
+process_dataset(test_filename, test_path)
 hist = train_and_eval(model_dir, 'WnD', columns, train_path, test_path)
 output = open(model_dir + 'Runs%d.pkl' % (num_epochs), 'wb')
 pickle.dump(hist, output)
