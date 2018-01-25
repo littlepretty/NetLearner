@@ -8,7 +8,9 @@ import tensorflow as tf
 from math import ceil
 from keras.models import Model, load_model
 from keras.layers import Input, Dense, Dropout
+import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 np.random.seed(4567)
 tf.set_random_seed(4567)
 model_dir = 'SparseAE/'
@@ -32,7 +34,7 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 pretrain = True
-num_epoch = 2
+num_epoch = 100
 if pretrain is True:
     feature_size = train_dataset.shape[1]
     encoder_size = 800
