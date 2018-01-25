@@ -10,7 +10,7 @@ class Autoencoder(object):
                  optimizer=tf.train.AdamOptimizer,
                  transfer_func=tf.nn.softplus, sparsity=.0,
                  sparsity_weight=.0, mask_fraction=.0,
-                 init_lr=0.1, decay_steps=10000):
+                 init_lr=0.1, decay_steps=100.0):
         self.feature_size = feature_size
         self.encode_size = encode_size
         self.transfer_func = transfer_func
@@ -25,10 +25,10 @@ class Autoencoder(object):
 
         # model
         self.x = tf.placeholder(tf.float32, [None, self.feature_size])
-        global_step = tf.Variable(0, trainable=False)
+        global_step = tf.Variable(0)
         self.lr = tf.train.exponential_decay(init_lr, global_step,
                                              decay_steps, 0.96,
-                                             staircase=True)
+                                             staircase=False)
 
         self.train_loss_record = tf.placeholder(tf.float32, name='train_loss')
         self.valid_loss_record = tf.placeholder(tf.float32, name='valid_loss')
@@ -44,13 +44,14 @@ class Autoencoder(object):
         self.loss = self._create_loss_node()
         self.optimizer = optimizer(self.lr).minimize(self.loss,
                                                      global_step=global_step)
-
-        # time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
-        # self.dirname = self.name + '/Run-' + time_str
+        """
+        time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
+        self.dirname = self.name + '/Run-' + time_str
         self.train_writer = tf.summary.FileWriter(self.dirname)
         self._create_summaries()
         self.merged_summary = tf.summary.merge_all()
-
+        """
+        self.dirname = dirname
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
@@ -81,7 +82,7 @@ class Autoencoder(object):
                       self.weights['b2'])
 
     def _create_reconstruction_loss_node(self):
-        reconstruction_loss = .5 * tf.reduce_sum(tf.pow(
+        reconstruction_loss = .5 * tf.reduce_mean(tf.pow(
             tf.subtract(self.reconstruction, self.x), 2.0))
         return reconstruction_loss
 
@@ -123,16 +124,16 @@ class Autoencoder(object):
         tf.summary.scalar('kl divergence', self.kl_divergence_record)
         tf.summary.scalar('learning rate', self.lr)
         tf.summary.scalar('encoder size', self.encode_size)
-        if self.name == 'SparseAE':
+        if isinstance(self, SparseAutoencoder):
             tf.summary.scalar('sparsity', self.sparsity)
             tf.summary.scalar('sparsity weight', self.sparsity_weight)
-        if self.name == 'MaskNoiseAE':
+        if isinstance(self, MaskNoiseAutoencoder):
             tf.summary.scalar('mask fraction', self.mask_fraction)
 
     def partial_fit(self, X):
-        opt, loss = self.sess.run([self.optimizer, self.loss],
-                                  feed_dict={self.x: X})
-        return loss
+        opt, loss, lr = self.sess.run([self.optimizer, self.loss, self.lr],
+                                      feed_dict={self.x: X})
+        return loss, lr
 
     def calc_kl_divergence(self, X):
         if self.kl_divergence is not None:
@@ -185,7 +186,7 @@ class Autoencoder(object):
     def train_with_labels(self, train_dataset, train_labels, batch_size,
                           num_steps, valid_dataset):
         display_step = num_steps // 10
-        summary_step = num_steps // 100
+        # summary_step = num_steps // 100
         num_labels = train_labels.shape[1]
         print('Training for %d steps' % num_steps)
 
@@ -212,14 +213,12 @@ class Autoencoder(object):
             perm = np.random.permutation(batch_data.shape[0])
             batch_data = batch_data[perm, :]
 
-            loss = self.partial_fit(batch_data)
-            lr = self.sess.run([self.lr])
-
+            loss, lr = self.partial_fit(batch_data)
+            """
             if step != 0 and step % summary_step == 0:
                 kl = self.calc_kl_divergence(batch_data)
                 train_loss = self.calc_reconstruct_loss(train_dataset)
                 valid_loss = self.calc_reconstruct_loss(valid_dataset)
-                lr = self.sess.run([self.lr])
                 summaries = self.sess.run(
                     self.merged_summary,
                     feed_dict={self.x: batch_data,
@@ -228,20 +227,20 @@ class Autoencoder(object):
                                self.kl_divergence_record: kl,
                                self.keep_prob: 1.0 - self.mask_fraction})
                 self.train_writer.add_summary(summaries, step)
-
+            """
             if step != 0 and step % display_step == 0:
                 kl = self.calc_kl_divergence(batch_data)
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 train_loss = self.calc_reconstruct_loss(train_dataset)
                 valid_loss = self.calc_reconstruct_loss(valid_dataset)
                 print("Minibatch(%d cases) loss at step %d: %.6f"
-                      % (batch_data.shape[0], step, loss, kl, lr))
-                print("kl=%.4f, lr=%.6f" % (kl, lr))
+                      % (batch_data.shape[0], step, loss))
+                print("kl=%.4f, lr=%s" % (kl, lr))
                 print("Batch reconstruction loss: %f" % batch_loss)
                 print("Train reconstruction loss: %f" % train_loss)
                 print("Valid reconstruction loss: %f" % valid_loss)
 
-        print('%s Trained' % self.name)
+        print("Finish training")
 
 
 class SparseAutoencoder(Autoencoder):
@@ -257,17 +256,16 @@ class SparseAutoencoder(Autoencoder):
 
     def _create_kl_node(self):
         """Calculate the kl divergence between active nodes
-        and sparsity vector"""
-        """
+        and sparsity vector
         return tf.reduce_sum(tf.reduce_mean(tf.abs(self.encode),
                                             reduction_indices=0))
         """
         sparsity_vector = tf.constant(self.sparsity, shape=[self.encode_size],
                                       dtype=tf.float32, name='sparsity_vector')
         # convert average activity to probabilistic distribution
-        activity = tf.reduce_mean(self.encode, reduction_indices=0)
-        activity = tf.reshape(activity, [self.encode_size])
-
+        activity = tf.reduce_mean(self.encode, axis=0)
+        # activity = tf.reshape(activity, [self.encode_size])
+        """
         # KL(P, Q) = cross_entropy(P, Q) - entropy(P),
         # where P is sparsity vector
         cross_entropy = tf.reduce_sum(tf.multiply(sparsity_vector,
@@ -275,8 +273,10 @@ class SparseAutoencoder(Autoencoder):
         entropy = tf.reduce_sum(
             tf.multiply(sparsity_vector,
                         -tf.log(tf.transpose(sparsity_vector))))
-
         return tf.subtract(cross_entropy, entropy)
+        """
+        logdiv = tf.log(tf.div(sparsity_vector, activity))
+        return tf.reduce_sum(tf.multiply(sparsity_vector, logdiv))
 
     def _create_loss_node(self):
         return tf.add(self.reconstruction_loss,

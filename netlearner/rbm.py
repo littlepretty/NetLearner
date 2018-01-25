@@ -1,19 +1,19 @@
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
-from utils import sample_prob_dist, get_batch, create_dir
-from time import localtime, strftime
+from utils import sample_prob_dist, get_batch
+# from time import localtime, strftime
 
 
 class RestrictedBoltzmannMachine(object):
     def __init__(self, num_visible, num_hidden, batch_size,
                  trans_func=tf.nn.sigmoid, num_labels=5,
-                 restore_dir=None, name='rbm'):
+                 restore_dir=None, dirname='RBM'):
         self.num_visible = num_visible
         self.num_hidden = num_hidden
         self.num_labels = num_labels
         self.trans_func = trans_func
-        self.name = name
+        self.dirname = dirname
 
         self.weights = self._initialize_weights()
 
@@ -48,23 +48,23 @@ class RestrictedBoltzmannMachine(object):
         # measure the goodness of the weights
         self.goodness = self._create_goodness()
         self.free_energy = self._create_free_energy()
-
+        """
         time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
         self.dirname = self.name + '/Run-' + time_str
         self.train_writer = tf.summary.FileWriter(self.dirname)
         self._create_summaries()
         self.merged_summary = tf.summary.merge_all()
-
+        """
         self.sess = tf.Session()
         self.saver = tf.train.Saver(self.weights)
         if restore_dir is not None:
-            self.model_dir = restore_dir
-            self.saver.restore(self.sess, self.model_dir)
+            self.session_path = restore_dir
+            self.saver.restore(self.sess, self.session_dir)
             print('Model restored')
         else:
             init = tf.global_variables_initializer()
-            self.model_dir = 'rbm_models/%dby%d' % (num_visible, num_hidden)
-            create_dir('rbm_models')
+            self.session_path = self.dirname + '%dby%d' % (num_visible,
+                                                           num_hidden)
             self.sess.run(init)
             print('RBM Model built and initialized')
 
@@ -242,7 +242,7 @@ class RestrictedBoltzmannMachine(object):
     def train_with_labels(self, train_dataset, train_labels, num_steps,
                           valid_dataset, init_lr=0.1):
         display_step = num_steps // 10
-        summary_step = num_steps // 10
+        # summary_step = num_steps // 10
 
         num_labels = train_labels.shape[1]
         print('Training for %d steps' % num_steps)
@@ -271,7 +271,7 @@ class RestrictedBoltzmannMachine(object):
             batch_data = batch_data[perm, :]
             lr = init_lr * np.power(0.64, float(step) / float(num_steps))
             l, w, bh, bv = self.run_train_step(batch_data, lr)
-
+            """
             if step % summary_step == 0:
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 train_free_energy = self.calculate_free_energy(train_dataset)
@@ -285,8 +285,13 @@ class RestrictedBoltzmannMachine(object):
                                                    batch_loss,
                                                    self.lr: lr})
                 self.train_writer.add_summary(summary, step)
-
+            """
             if step % display_step == 0:
+                batch_loss = self.calc_reconstruct_loss(batch_data)
+                train_free_energy = self.calculate_free_energy(train_dataset)
+                valid_free_energy = self.calculate_free_energy(valid_dataset)
+                avg_tfe = np.mean(train_free_energy)
+                avg_vfe = np.mean(valid_free_energy)
                 print("Batch loss at step %d: %.6f(lr=%.6f)" % (step, l, lr))
                 print("Batch reconstruction loss at step %d: %f" %
                       (step, batch_loss))
@@ -306,5 +311,5 @@ class RestrictedBoltzmannMachine(object):
         return self.sess.run(self.weights[name])
 
     def save_variables(self):
-        save_path = self.saver.save(self.sess, self.model_dir)
+        save_path = self.saver.save(self.sess, self.session_path)
         print("Model saved to file", save_path)

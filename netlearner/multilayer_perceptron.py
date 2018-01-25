@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from utils import xavier_init, accuracy, measure_prediction
 from utils import permutate_dataset, get_batch
-from time import localtime, strftime
+# from time import localtime, strftime
 
 
 class MultilayerPerceptron(object):
@@ -42,13 +42,14 @@ class MultilayerPerceptron(object):
             learning_rate=self.lr).minimize(self.loss, global_step=global_step)
 
         self.predict = tf.nn.softmax(self.final_logits)
-
+        """
         time_str = strftime("%b-%d-%Y-%H-%M-%S", localtime())
         self.dirname = name + '/Run-' + time_str
         self.train_writer = tf.summary.FileWriter(self.dirname)
         self._create_summaries()
         self.merged_summary = tf.summary.merge_all()
-
+        """
+        self.dirname = name
         init = tf.global_variables_initializer()
         self.sess = tf.Session()
         self.sess.run(init)
@@ -115,24 +116,25 @@ class MultilayerPerceptron(object):
         tf.summary.scalar('input dimension', self.feature_size)
         for (layer, size) in enumerate(self.layer_sizes):
             layer_weight = tf.transpose(self.params['w%d' % layer])
-            # x_min = tf.reduce_min(layer_weight)
-            # x_max = tf.reduce_max(layer_weight)
-            # normalized_layer_weight = tf.div(layer_weight - x_min,
-            # x_max - x_min)
-            # num_neurons = normalized_layer_weight.get_shape()[0].value
-            # input_dim = normalized_layer_weight.get_shape()[1].value
-            # print("%d * %d matrix" % (num_neurons, input_dim))
-            # images = tf.reshape(normalized_layer_weight,
-            # [num_neurons, input_dim, 1, 1])
-            # tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
+            x_min = tf.reduce_min(layer_weight)
+            x_max = tf.reduce_max(layer_weight)
+            normalized_layer_weight = tf.div(layer_weight - x_min,
+                                             x_max - x_min)
+            num_neurons = normalized_layer_weight.get_shape()[0].value
+            input_dim = normalized_layer_weight.get_shape()[1].value
+            print("%d * %d matrix" % (num_neurons, input_dim))
+            images = tf.reshape(normalized_layer_weight,
+                                [num_neurons, input_dim, 1, 1])
+            tf.summary.image('layer%d' % (layer + 1), images, max_outputs=16)
             tf.summary.scalar('layer %d size' % (layer + 1), size)
-            # tf.summary.histogram('histogram of layer %d weights' % (layer + 1), layer_weight)
-            # tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
-            # tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
-            # mean = tf.reduce_mean(layer_weight)
-            # tf.summary.scalar('mean in layer %d' % (layer + 1), mean)
-            # stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
-            # tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
+            tf.summary.histogram('histogram of layer %d weights' % (layer + 1),
+                                 layer_weight)
+            tf.summary.scalar('min weight in layer %d' % (layer + 1), x_min)
+            tf.summary.scalar('max weight in layer %d' % (layer + 1), x_max)
+            mean = tf.reduce_mean(layer_weight)
+            tf.summary.scalar('mean in layer %d' % (layer + 1), mean)
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(layer_weight - mean)))
+            tf.summary.scalar('stddev in layer %d' % (layer + 1), stddev)
 
         tf.summary.scalar('learning rate', self.lr)
         tf.summary.scalar('keep prob', self.keep_prob)
@@ -143,11 +145,11 @@ class MultilayerPerceptron(object):
         tf.summary.scalar('test accuracy', self.test_accuracy_record)
 
     def fit(self, X, T, prob=0.5):
-        opt, loss, reg = self.sess.run(
-            [self.optimizer, self.loss, self.regterm],
+        opt, loss, reg, lr = self.sess.run(
+            [self.optimizer, self.loss, self.regterm, self.lr],
             feed_dict={self.x: X, self.t: T,
                        self.keep_prob: prob})
-        return loss, reg
+        return loss, reg, lr
 
     def make_prediction(self, X):
         # Don't use dropout during testing
@@ -183,17 +185,13 @@ class MultilayerPerceptron(object):
                           valid_dataset, valid_labels,
                           test_dataset, test_labels, keep_prob=0.8):
         display_step = num_steps // 10
-        summary_step = num_steps // 100
+        # summary_step = num_steps // 100
         print('Training for %d steps' % num_steps)
         train_dataset, train_labels = permutate_dataset(train_dataset,
                                                         train_labels)
         y = np.argmax(train_labels, 1)
         X = np.array([train_dataset[y == i, :] for i in range(self.num_labels)])
         Y = np.array([train_labels[y == i, :] for i in range(self.num_labels)])
-
-        train_accu = 0.0
-        valid_accu = 0.0
-        valid_loss = 0.0
 
         batch_size /= self.num_labels
         for step in range(num_steps):
@@ -220,8 +218,9 @@ class MultilayerPerceptron(object):
             perm = np.random.permutation(batch_data.shape[0])
             batch_data = batch_data[perm, :]
             batch_labels = batch_labels[perm, :]
-            loss, reg = self.fit(batch_data, batch_labels, keep_prob)
+            loss, reg, lr = self.fit(batch_data, batch_labels, keep_prob)
 
+            """
             if step != 0 and step % summary_step == 0:
                 train_predict = self.make_prediction(train_dataset)
                 train_accu = accuracy(train_predict, train_labels)
@@ -234,8 +233,10 @@ class MultilayerPerceptron(object):
                 valid_accu = accuracy(valid_predict, valid_labels)
                 test_predict = self.make_prediction(test_dataset)
                 test_accu = accuracy(test_predict, test_labels)
+
                 self.make_summary(train_accu, valid_loss, valid_accu,
                                   test_accu, keep_prob, step)
+            """
 
             if step != 0 and step % display_step == 0:
                 batch_predict = self.make_prediction(batch_data)
@@ -254,17 +255,19 @@ class MultilayerPerceptron(object):
         print('Multilayer Perceptron trained')
         train_loss = self.calc_total_loss(train_dataset, train_labels)
         print("Trainset total loss: %f" % train_loss)
+
         train_predict = self.make_prediction(train_dataset)
-        train_accu = accuracy(train_predict, train_labels)
         measure_prediction(train_predict, train_labels, self.dirname, 'Train')
 
         valid_predict = self.make_prediction(valid_dataset)
-        valid_accu = accuracy(valid_predict, valid_labels)
         measure_prediction(valid_predict, valid_labels, self.dirname, 'Valid')
 
         test_predict = self.make_prediction(test_dataset)
-        test_accu = accuracy(test_predict, test_labels)
         measure_prediction(test_predict, test_labels, self.dirname, 'Test')
-
+        """
+        train_accu = accuracy(train_predict, train_labels)
+        valid_accu = accuracy(valid_predict, valid_labels)
+        test_accu = accuracy(test_predict, test_labels)
         self.make_summary(train_accu, valid_loss, valid_accu, test_accu,
                           keep_prob, num_steps)
+        """
