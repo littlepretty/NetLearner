@@ -1,17 +1,24 @@
 from __future__ import print_function, division
 import numpy as np
-from netlearner.utils import min_max_scale, maybe_npsave
+from netlearner.utils import min_max_scale, measure_prediction
 from netlearner.rbm import RestrictedBoltzmannMachine
+from preprocess.nslkdd import generate_dataset
 import tensorflow as tf
 from math import ceil
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout
 
 tf.set_random_seed(9876)
-encoder_name = 'RBM'
-raw_train_dataset = np.load('NSLKDD/train_dataset.npy')
-train_labels = np.load('NSLKDD/train_ref.npy')
-raw_valid_dataset = np.load('NSLKDD/valid_dataset.npy')
-valid_labels = np.load('NSLKDD/valid_ref.npy')
-raw_test_dataset = np.load('NSLKDD/test_dataset.npy')
+model_dir = 'RBM/'
+generate_dataset(False, True, model_dir)
+data_dir = model_dir + 'NSLKDD/'
+raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
+train_labels = np.load(data_dir + 'train_labels.npy')
+raw_valid_dataset = np.load(data_dir + 'valid_dataset.npy')
+valid_labels = np.load(data_dir + 'valid_labels.npy')
+raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
+test_labels = np.load(data_dir + 'test_labels.npy')
+
 [train_dataset, valid_dataset, test_dataset] = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
 print('Training set', train_dataset.shape, train_labels.shape)
@@ -22,32 +29,42 @@ feature_size = train_dataset.shape[1]
 num_hidden_rbm = 100
 rbm_lr = 0.01
 batch_size = 10
-num_epochs = 40
-num_steps = ceil(train_dataset.shape[0] / batch_size * num_epochs)
+num_epoch = 1
+num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
 rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
                                  batch_size, trans_func=tf.nn.sigmoid,
-                                 name=encoder_name)
-print('Restricted Boltzmann Machine built')
+                                 num_labels=5, dirname=data_dir)
 rbm.train_with_labels(train_dataset, train_labels, int(num_steps),
                       valid_dataset, rbm_lr)
 test_loss = rbm.calc_reconstruct_loss(test_dataset)
 print("Testset reconstruction error: %f" % test_loss)
 
+rbm_w = rbm.get_weights('w')
+rbm_b = rbm.get_weights('bh')
+"""
 hrand = np.random.random((train_dataset.shape[0], num_hidden_rbm))
 rbm_train_dataset = rbm.encode_dataset(train_dataset, hrand)
 hrand = np.random.random((valid_dataset.shape[0], num_hidden_rbm))
 rbm_valid_dataset = rbm.encode_dataset(valid_dataset, hrand)
 hrand = np.random.random((test_dataset.shape[0], num_hidden_rbm))
 rbm_test_dataset = rbm.encode_dataset(test_dataset, hrand)
-print('Encoded training set', rbm_train_dataset.shape)
-print('Encoded valid set', rbm_valid_dataset.shape)
-print('Encoded test set', rbm_test_dataset.shape)
-tr_fn = maybe_npsave('trainset.' + encoder_name, rbm_train_dataset,
-                     0, rbm_train_dataset.shape[0], True)
-va_fn = maybe_npsave('validset.' + encoder_name, rbm_valid_dataset,
-                     0, rbm_valid_dataset.shape[0], True)
-te_fn = maybe_npsave('testset.' + encoder_name, rbm_test_dataset,
-                     0, rbm_test_dataset.shape[0], True)
-print('Encoded train set %s saved to %s' % (rbm_train_dataset.shape, tr_fn))
-print('Encoded valid set %s saved to %s' % (rbm_valid_dataset.shape, va_fn))
-print('Encoded test set %s saved to %s' % (rbm_test_dataset.shape, te_fn))
+"""
+tf.reset_default_graph()
+input_layer = Input(shape=(train_dataset.shape[1], ), name='input')
+h1 = Dense(num_hidden_rbm, activation='sigmoid', name='h1')(input_layer)
+h1 = Dropout(0.9)(h1)
+h2 = Dense(480, activation='relu', name='h2')(h1)
+sm = Dense(2, activation='softmax', name='output')(h2)
+mlp = Model(inputs=input_layer, outputs=sm)
+mlp.compile(optimizer='adam', loss='categorical_crossentropy',
+            metrics=['accuracy'])
+mlp.summary()
+mlp.get_layer('h1').set_weights([rbm_w, rbm_b])
+hist = mlp.fit(train_dataset, train_labels,
+               batch_size=80, epochs=num_epoch, verbose=1)
+score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
+print('%s = %s' % (mlp.metrics_names, score))
+predictions = mlp.predict(train_dataset)
+measure_prediction(predictions, train_labels, data_dir, 'Train')
+predictions = mlp.predict(test_dataset)
+measure_prediction(predictions, test_labels, data_dir, 'Test')

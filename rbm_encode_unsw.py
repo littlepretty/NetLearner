@@ -27,7 +27,7 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 pretrain = True
-num_epoch = 100
+num_epoch = 120
 if pretrain is True:
     num_samples = train_dataset.shape[0]
     feature_size = train_dataset.shape[1]
