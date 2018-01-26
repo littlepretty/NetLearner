@@ -90,8 +90,8 @@ def input_builder(data_file, columns):
                           engine='python', skiprows=1)
     labels = df_data['label']
     labels_ohe = np.zeros((labels.shape[0], len(label_mapping)))
-    for x in labels:
-        labels_ohe[label_mapping[x]] = 1.0
+    for (i, x) in enumerate(labels):
+        labels_ohe[i][label_mapping[x]] = 1.0
 
     dataset = df_data.drop('label', axis=1)
     dataset['land'] = dataset['land'].astype(str)
@@ -124,13 +124,13 @@ def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
         for key in results:
             logger.info("%s: %s" % (key, results[key]))
 
-    predictions = []
-    for x in m.predict(test_ib):
-        predictions.append(x['probabilities'])
+    predictions = np.zeros_like(ohe)
+    for (i, x) in enumerate(list(m.predict(test_ib))):
+        predictions[i][x['class_ids'][0]] = 1.0
 
     conf_table = measure_prediction(np.array(predictions), ohe, model_dir)
     history['confusion_table'] = conf_table
-
+    print(conf_table)
     return history
 
 
@@ -205,7 +205,7 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 120
+num_epochs = 180
 batch_size = 40
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
@@ -244,11 +244,11 @@ for e in epoch_list:
 """
 fig, ax1 = plt.subplots()
 ax1.plot([x['accuracy'] for x in hist['train']], 'r--')
-ax1.set_ylabel('train', color='r')
+ax1.set_ylabel('Trainset', color='r')
 ax1.tick_params('y', colors='r')
 ax2 = ax1.twinx()
 ax2.plot([x['accuracy'] for x in hist['test']], 'b:')
-ax2.set_ylabel('test', color='b')
+ax2.set_ylabel('Testset', color='b')
 ax2.tick_params('y', colors='b')
 ax1.grid(color='k', linestyle=':', linewidth=1)
 ax2.grid(color='k', linestyle=':', linewidth=1)
@@ -258,15 +258,14 @@ plt.close()
 
 fig, ax1 = plt.subplots()
 ax1.plot([x['average_loss'] for x in hist['train']], 'r--')
-ax1.set_ylabel('train', color='r')
+ax1.set_ylabel('Trainset', color='r')
 ax1.tick_params('y', colors='r')
 ax2 = ax1.twinx()
 ax2.plot([x['average_loss'] for x in hist['test']], 'b:')
-ax2.set_ylabel('test', color='b')
+ax2.set_ylabel('Testset', color='b')
 ax2.tick_params('y', colors='b')
 ax1.grid(color='k', linestyle=':', linewidth=1)
 ax2.grid(color='k', linestyle=':', linewidth=1)
 fig.tight_layout()
-plt.grid(which='both', color='k', linestyle=':', linewidth=1)
 plt.savefig(model_dir + 'loss_%d.pdf' % num_epochs, format='pdf')
 plt.close()
