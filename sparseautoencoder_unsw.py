@@ -3,7 +3,7 @@ import numpy as np
 from netlearner.utils import min_max_scale, hyperparameter_summary
 from netlearner.utils import permutate_dataset, measure_prediction
 from netlearner.autoencoder import SparseAutoencoder
-from preprocess import unsw
+# from preprocess import unsw
 import tensorflow as tf
 from math import ceil
 from keras.models import Model, load_model
@@ -15,7 +15,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 np.random.seed(4567)
 tf.set_random_seed(4567)
 model_dir = 'SparseAE/'
-unsw.generate_dataset(True, model_dir)
+# unsw.generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
 mlp_path = data_dir + 'sae_mlp.h5'
 
@@ -79,7 +79,7 @@ hist = mlp.fit(train_dataset, train_labels,
                batch_size, epochs=num_epoch, verbose=1,
                validation_data=(test_dataset, test_labels))
 output = open(data_dir + 'Runs%d.pkl' % (num_epoch), 'wb')
-pickle.dump(hist, output)
+pickle.dump(hist.history, output)
 output.close()
 score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
 print('%s = %s' % (mlp.metrics_names, score))
