@@ -12,8 +12,6 @@ import os
 import pickle
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-np.random.seed(4567)
-tf.set_random_seed(4567)
 model_dir = 'SparseAE/'
 unsw.generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
@@ -25,7 +23,6 @@ raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
 train_labels = np.load(data_dir + 'train_labels.npy')
 valid_labels = np.load(data_dir + 'valid_labels.npy')
 test_labels = np.load(data_dir + 'test_labels.npy')
-
 train_dataset, valid_dataset, test_dataset = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
 train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
@@ -35,7 +32,7 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 pretrain = True
-num_epoch = 120
+num_epoch = 160
 batch_size = 80
 if pretrain is True:
     feature_size = train_dataset.shape[1]
@@ -60,14 +57,14 @@ if pretrain is True:
                       'act_func': 'sigmoid',
                       'batch_size': batch_size, }
     hyperparameter_summary(sae.dirname, hyperparameter)
-    tf.reset_default_graph()
 
+    tf.reset_default_graph()
     input_layer = Input(shape=(train_dataset.shape[1], ), name='input')
     h1 = Dense(encoder_size, activation='relu', name='h1')(input_layer)
     h1 = Dropout(0.8)(h1)
     h2 = Dense(480, activation='relu', name='h2')(h1)
     sm = Dense(2, activation='softmax', name='output')(h2)
-    mlp = Model(inputs=input_layer, outputs=sm, name='rbm_mlp')
+    mlp = Model(inputs=input_layer, outputs=sm, name='sae_mlp')
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
     mlp.summary()

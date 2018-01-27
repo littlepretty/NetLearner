@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 import numpy as np
 from netlearner.utils import min_max_scale, measure_prediction
-from netlearner.utils import hyperparameter_summary
+from netlearner.utils import hyperparameter_summary, permutate_dataset
 from netlearner.rbm import RestrictedBoltzmannMachine
 from preprocess.unsw import generate_dataset
 import tensorflow as tf
@@ -11,7 +11,7 @@ from keras.layers import Input, Dense, Dropout
 import pickle
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 model_dir = 'RBM/'
 generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
@@ -25,11 +25,14 @@ raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
 test_labels = np.load(data_dir + 'test_labels.npy')
 [train_dataset, valid_dataset, test_dataset] = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
+train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
+valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
+test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 pretrain = True
-num_epoch = 1
+num_epoch = 160
 if pretrain is True:
     num_samples = train_dataset.shape[0]
     feature_size = train_dataset.shape[1]

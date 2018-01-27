@@ -16,7 +16,7 @@ from netlearner.utils import measure_prediction
 
 
 def build_model(model_dir, model_type):
-    hidden_layers = [1024, 512, 256]
+    hidden_layers = [800, 480, 256]
     label_names = label_mapping.keys()
     if model_type == 'wide':
         m = tf.estimator.LinearClassifier(
@@ -140,11 +140,7 @@ CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
 print(symbolic_names)
 print(continuous_names)
 print(discrete_names)
-"""
-quantile_names = []
-for name in continuous_names + discrete_names:
-    quantile_names.append(name + '_quantile')
-"""
+
 # Build wide columns
 protocol = tf.feature_column.categorical_column_with_vocabulary_list(
     'protocol', get_categorical_values('protocol'))
@@ -205,8 +201,8 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 180
-batch_size = 40
+num_epochs = 240
+batch_size = 64
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 
@@ -214,7 +210,7 @@ scaler = MinMaxScaler()
 scaler_fitted = False
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('WD')
+logger = logging.getLogger('WD-NSLKDD')
 hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
 formatter = logging.Formatter('%(asctime)s %(message)s')
 hdlr.setFormatter(formatter)
@@ -230,18 +226,17 @@ output.close()
 
 """
 model_dir = 'WideDeepModel/NSLKDD/'
-epoch_list = [320, 160]
-num_epochs = 480
-hist = dict()
+epoch_list = [1]
+num_epochs = sum(epoch_list)
+hist = {'train': [], 'test': []}
 for e in epoch_list:
     output = open(model_dir + 'Runs%d.pkl' % e, 'rb')
     temp = pickle.load(output)
-    for (key, value) in temp.items():
-        if key not in hist:
-            hist[key] = []
-
-        hist[key] += temp[key]
+    print(temp)
+    hist['train'] += temp['train']
+    hist['test'] += temp['test']
 """
+
 fig, ax1 = plt.subplots()
 ax1.plot([x['accuracy'] for x in hist['train']], 'r--')
 ax1.set_ylabel('Trainset', color='r')
