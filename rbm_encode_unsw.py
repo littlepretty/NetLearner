@@ -8,8 +8,10 @@ import tensorflow as tf
 from math import ceil
 from keras.models import Model, load_model
 from keras.layers import Input, Dense, Dropout
+import pickle
+import os
 
-tf.set_random_seed(9876)
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 model_dir = 'RBM/'
 generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
@@ -27,11 +29,11 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
 pretrain = True
-num_epoch = 120
+num_epoch = 1
 if pretrain is True:
     num_samples = train_dataset.shape[0]
     feature_size = train_dataset.shape[1]
-    num_hidden_rbm = 400
+    num_hidden_rbm = 800
     rbm_lr = 0.01
     batch_size = 10
     num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
@@ -69,9 +71,20 @@ else:
     mlp = load_model(mlp_path)
 
 hist = mlp.fit(train_dataset, train_labels,
-               batch_size=80, epochs=num_epoch, verbose=1)
-score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
-print('%s = %s' % (mlp.metrics_names, score))
+               batch_size=80, epochs=num_epoch, verbose=1,
+               validation_data=(test_dataset, test_labels))
+output = open(data_dir + 'Runs%d.pkl' % (num_epoch), 'wb')
+pickle.dump(hist.history, output)
+output.close()
+if pretrain is True:
+    score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
+    print('%s = %s' % (mlp.metrics_names, score))
+else:
+    avg_train = np.mean(hist.history['acc'])
+    avg_test = np.mean(hist.history['val_acc'])
+    print('Avg Train Accu: %.6f' % avg_train)
+    print('Avg Test Accu: %.6f' % avg_test)
+
 predictions = mlp.predict(train_dataset)
 measure_prediction(predictions, train_labels, data_dir, 'Train')
 predictions = mlp.predict(test_dataset)

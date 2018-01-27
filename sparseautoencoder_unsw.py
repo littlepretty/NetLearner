@@ -3,7 +3,7 @@ import numpy as np
 from netlearner.utils import min_max_scale, hyperparameter_summary
 from netlearner.utils import permutate_dataset, measure_prediction
 from netlearner.autoencoder import SparseAutoencoder
-# from preprocess import unsw
+from preprocess import unsw
 import tensorflow as tf
 from math import ceil
 from keras.models import Model, load_model
@@ -15,7 +15,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 np.random.seed(4567)
 tf.set_random_seed(4567)
 model_dir = 'SparseAE/'
-# unsw.generate_dataset(True, model_dir)
+unsw.generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
 mlp_path = data_dir + 'sae_mlp.h5'
 
@@ -34,8 +34,8 @@ test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
-pretrain = False
-num_epoch = 64
+pretrain = True
+num_epoch = 120
 batch_size = 80
 if pretrain is True:
     feature_size = train_dataset.shape[1]
@@ -81,8 +81,15 @@ hist = mlp.fit(train_dataset, train_labels,
 output = open(data_dir + 'Runs%d.pkl' % (num_epoch), 'wb')
 pickle.dump(hist.history, output)
 output.close()
-score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
-print('%s = %s' % (mlp.metrics_names, score))
+if pretrain is True:
+    score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
+    print('%s = %s' % (mlp.metrics_names, score))
+else:
+    avg_train = np.mean(hist.history['acc'])
+    avg_test = np.mean(hist.history['val_acc'])
+    print('Avg Train Accu: %.6f' % avg_train)
+    print('Avg Test Accu: %.6f' % avg_test)
+
 predictions = mlp.predict(train_dataset)
 measure_prediction(predictions, train_labels, data_dir, 'Train')
 predictions = mlp.predict(test_dataset)
