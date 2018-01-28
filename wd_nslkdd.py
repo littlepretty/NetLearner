@@ -201,8 +201,8 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 240
-batch_size = 64
+num_epochs = 120
+batch_size = 100
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 
@@ -236,13 +236,21 @@ for e in epoch_list:
     hist['train'] += temp['train']
     hist['test'] += temp['test']
 """
+train_accu = [x['accuracy'] for x in hist['train']]
+test_accu = [x['accuracy'] for x in hist['test']]
+avg_train = np.mean(train_accu)
+avg_test = np.mean(test_accu)
+std_train = np.std(train_accu)
+std_test = np.std(test_accu)
+print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
 
 fig, ax1 = plt.subplots()
-ax1.plot([x['accuracy'] for x in hist['train']], 'r--')
+ax1.plot(train_accu, 'r--')
 ax1.set_ylabel('Trainset', color='r')
 ax1.tick_params('y', colors='r')
 ax2 = ax1.twinx()
-ax2.plot([x['accuracy'] for x in hist['test']], 'b:')
+ax2.plot(test_accu, 'b:')
 ax2.set_ylabel('Testset', color='b')
 ax2.tick_params('y', colors='b')
 ax1.grid(color='k', linestyle=':', linewidth=1)
