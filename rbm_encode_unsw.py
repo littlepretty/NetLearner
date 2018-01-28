@@ -31,10 +31,10 @@ test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
-pretrain = True
-num_epoch = 160
+pretrain = False
+num_epoch = 80
 if pretrain is True:
-    num_samples = train_dataset.shape[0]
+    (num_samples, num_labels) = train_labels.shape
     feature_size = train_dataset.shape[1]
     num_hidden_rbm = 800
     rbm_lr = 0.01
@@ -42,8 +42,7 @@ if pretrain is True:
     num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
     rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
                                      batch_size, trans_func=tf.nn.sigmoid,
-                                     num_labels=2,
-                                     dirname=data_dir)
+                                     num_labels=num_labels, dirname=data_dir)
     rbm.train_with_labels(train_dataset, train_labels,
                           int(num_steps),
                           valid_dataset, rbm_lr)
@@ -64,7 +63,7 @@ if pretrain is True:
     h1 = Dense(num_hidden_rbm, activation='sigmoid', name='h1')(input_layer)
     h1 = Dropout(0.8)(h1)
     h2 = Dense(480, activation='sigmoid', name='h2')(h1)
-    sm = Dense(2, activation='softmax', name='output')(h2)
+    sm = Dense(num_labels, activation='softmax', name='output')(h2)
     mlp = Model(inputs=input_layer, outputs=sm, name='rbm_mlp')
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
@@ -85,8 +84,10 @@ if pretrain is True:
 else:
     avg_train = np.mean(hist.history['acc'])
     avg_test = np.mean(hist.history['val_acc'])
-    print('Avg Train Accu: %.6f' % avg_train)
-    print('Avg Test Accu: %.6f' % avg_test)
+    std_train = np.std(hist.history['acc'])
+    std_test = np.std(hist.history['val_acc'])
+    print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+    print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
 
 predictions = mlp.predict(train_dataset)
 measure_prediction(predictions, train_labels, data_dir, 'Train')
