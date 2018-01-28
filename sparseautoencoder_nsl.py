@@ -1,52 +1,93 @@
 from __future__ import print_function, division
 import numpy as np
-from netlearner.utils import min_max_scale
+from netlearner.utils import min_max_scale, measure_prediction
+from netlearner.utils import permutate_dataset
 from netlearner.autoencoder import SparseAutoencoder
 from preprocess import nslkdd
 import tensorflow as tf
 from math import ceil
+from keras.models import Model, load_model
+from keras.layers import Input, Dense, Dropout
+import os
+import pickle
 
-np.random.seed(4567)
-tf.set_random_seed(4567)
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 model_dir = 'SparseAE/'
 nslkdd.generate_dataset(False, True, model_dir)
-
 data_dir = model_dir + 'NSLKDD/'
+mlp_path = data_dir + 'sae_mlp.h5'
+
 raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
 raw_valid_dataset = np.load(data_dir + 'valid_dataset.npy')
 raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
+train_labels = np.load(data_dir + 'train_labels.npy')
+valid_labels = np.load(data_dir + 'valid_labels.npy')
+test_labels = np.load(data_dir + 'test_labels.npy')
 train_dataset, valid_dataset, test_dataset = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
-train_labels = np.load(data_dir + 'train_labels.npy')
+train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
+valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
+test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
-feature_size = train_dataset.shape[1]
-encoder_size = 64
-init_lr = 0.01
-batch_size = 5000
-num_epochs = 1000
-num_steps = ceil(train_dataset.shape[0] / batch_size * num_epochs)
-autoencoder = SparseAutoencoder(feature_size, encoder_size, data_dir,
-                                optimizer=tf.train.AdamOptimizer,
-                                sparsity=0.25, sparsity_weight=1,
-                                init_lr=init_lr, decay_steps=num_steps)
-autoencoder.train_with_labels(train_dataset, train_labels,
-                              batch_size, int(num_steps), valid_dataset)
-test_loss = autoencoder.calc_reconstruct_loss(test_dataset)
-print("Testset reconstruction loss: %f" % test_loss)
+pretrain = True
+num_epoch = 160
+batch_size = 80
+if pretrain is True:
+    num_samples, num_classes = train_labels.shape
+    feature_size = train_dataset.shape[1]
+    encoder_size = 800
+    init_lr = 0.01
+    num_steps = ceil(num_samples / batch_size * num_epoch)
+    autoencoder = SparseAutoencoder(feature_size, encoder_size, data_dir,
+                                    optimizer=tf.train.AdamOptimizer,
+                                    sparsity=0.05, sparsity_weight=0.01,
+                                    init_lr=init_lr, decay_steps=num_steps)
+    autoencoder.train_with_labels(train_dataset, train_labels,
+                                  batch_size, int(num_steps), valid_dataset)
+    test_loss = autoencoder.calc_reconstruct_loss(test_dataset)
+    print("Testset reconstruction loss: %f" % test_loss)
+    sae_w = autoencoder.get_encode_weights()
+    sae_b = autoencoder.get_encode_biases()
+    """
+    sae_train_dataset = autoencoder.encode_dataset(train_dataset)
+    sae_valid_dataset = autoencoder.encode_dataset(valid_dataset)
+    sae_test_dataset = autoencoder.encode_dataset(test_dataset)
+    """
+    tf.reset_default_graph()
+    input_layer = Input(shape=(feature_size, ), name='input')
+    h1 = Dense(encoder_size, activation='relu', name='h1')(input_layer)
+    h1 = Dropout(0.8)(h1)
+    h2 = Dense(480, activation='relu', name='h2')(h1)
+    sm = Dense(num_classes, activation='softmax', name='output')(h2)
+    mlp = Model(inputs=input_layer, outputs=sm, name='sae_mlp')
+    mlp.compile(optimizer='adam', loss='categorical_crossentropy',
+                metrics=['accuracy'])
+    mlp.summary()
+    mlp.get_layer('h1').set_weights([sae_w, sae_b])
+else:
+    mlp = load_model(mlp_path)
 
-sae_train_dataset = autoencoder.encode_dataset(train_dataset)
-sae_valid_dataset = autoencoder.encode_dataset(valid_dataset)
-sae_test_dataset = autoencoder.encode_dataset(test_dataset)
-"""
-tr_fn = maybe_npsave('trainset.' + encoder_name, sae_train_dataset,
-                     0, sae_train_dataset.shape[0], True)
-va_fn = maybe_npsave('validset.' + encoder_name, sae_valid_dataset,
-                     0, sae_valid_dataset.shape[0], True)
-te_fn = maybe_npsave('testset.' + encoder_name, sae_test_dataset,
-                     0, sae_test_dataset.shape[0], True)
-print('Encoded train set %s saved to %s' % (sae_train_dataset.shape, tr_fn))
-print('Encoded valid set %s saved to %s' % (sae_valid_dataset.shape, va_fn))
-print('Encoded test set %s saved to %s' % (sae_test_dataset.shape, te_fn))
-"""
+hist = mlp.fit(train_dataset, train_labels,
+               batch_size, epochs=num_epoch, verbose=1,
+               validation_data=(test_dataset, test_labels))
+output = open(data_dir + 'Runs%d.pkl' % (num_epoch), 'wb')
+pickle.dump(hist.history, output)
+output.close()
+if pretrain is True:
+    score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
+    print('%s = %s' % (mlp.metrics_names, score))
+else:
+    avg_train = np.mean(hist.history['acc'])
+    avg_test = np.mean(hist.history['val_acc'])
+    std_train = np.std(hist.history['acc'])
+    std_test = np.std(hist.history['val_acc'])
+    print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+    print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
+
+predictions = mlp.predict(train_dataset)
+measure_prediction(predictions, train_labels, data_dir, 'Train')
+predictions = mlp.predict(test_dataset)
+measure_prediction(predictions, test_labels, data_dir, 'Test')
+mlp.save(mlp_path)

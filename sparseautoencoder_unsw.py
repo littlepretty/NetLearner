@@ -31,14 +31,15 @@ test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
 print('Training set', train_dataset.shape, train_labels.shape)
 print('Test set', test_dataset.shape)
 
-pretrain = True
-num_epoch = 160
+pretrain = False
+num_epoch = 80
 batch_size = 80
 if pretrain is True:
+    num_samples, num_classes = train_labels.shape
     feature_size = train_dataset.shape[1]
     encoder_size = 800
     init_lr = 0.01
-    num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
+    num_steps = ceil(num_samples / batch_size * num_epoch)
     sae = SparseAutoencoder(feature_size, encoder_size, data_dir,
                             optimizer=tf.train.AdamOptimizer,
                             transfer_func=tf.nn.relu,
@@ -63,7 +64,7 @@ if pretrain is True:
     h1 = Dense(encoder_size, activation='relu', name='h1')(input_layer)
     h1 = Dropout(0.8)(h1)
     h2 = Dense(480, activation='relu', name='h2')(h1)
-    sm = Dense(2, activation='softmax', name='output')(h2)
+    sm = Dense(num_classes, activation='softmax', name='output')(h2)
     mlp = Model(inputs=input_layer, outputs=sm, name='sae_mlp')
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
@@ -84,8 +85,10 @@ if pretrain is True:
 else:
     avg_train = np.mean(hist.history['acc'])
     avg_test = np.mean(hist.history['val_acc'])
-    print('Avg Train Accu: %.6f' % avg_train)
-    print('Avg Test Accu: %.6f' % avg_test)
+    std_train = np.std(hist.history['acc'])
+    std_test = np.std(hist.history['val_acc'])
+    print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+    print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
 
 predictions = mlp.predict(train_dataset)
 measure_prediction(predictions, train_labels, data_dir, 'Train')
