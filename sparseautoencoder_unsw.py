@@ -3,7 +3,7 @@ import numpy as np
 from netlearner.utils import min_max_scale, hyperparameter_summary
 from netlearner.utils import permutate_dataset, measure_prediction
 from netlearner.autoencoder import SparseAutoencoder
-from preprocess import unsw
+from preprocess.unsw import generate_dataset
 import tensorflow as tf
 from math import ceil
 from keras.models import Model, load_model
@@ -13,7 +13,7 @@ import pickle
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 model_dir = 'SparseAE/'
-unsw.generate_dataset(True, model_dir)
+generate_dataset(True, model_dir)
 data_dir = model_dir + 'UNSW/'
 mlp_path = data_dir + 'sae_mlp.h5'
 
@@ -60,7 +60,7 @@ if pretrain is True:
     hyperparameter_summary(sae.dirname, hyperparameter)
 
     tf.reset_default_graph()
-    input_layer = Input(shape=(train_dataset.shape[1], ), name='input')
+    input_layer = Input(shape=(feature_size, ), name='input')
     h1 = Dense(encoder_size, activation='relu', name='h1')(input_layer)
     h1 = Dropout(0.8)(h1)
     h2 = Dense(480, activation='relu', name='h2')(h1)
