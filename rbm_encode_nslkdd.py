@@ -25,21 +25,20 @@ raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
 test_labels = np.load(data_dir + 'test_labels.npy')
 [train_dataset, valid_dataset, test_dataset] = min_max_scale(
     raw_train_dataset, raw_valid_dataset, raw_test_dataset)
-
-print('Training set', train_dataset.shape, train_labels.shape)
-print('Test set', test_dataset.shape)
 train_dataset, train_labels = permutate_dataset(train_dataset, train_labels)
 valid_dataset, valid_labels = permutate_dataset(valid_dataset, valid_labels)
 test_dataset, test_labels = permutate_dataset(test_dataset, test_labels)
+print('Training set', train_dataset.shape, train_labels.shape)
+print('Test set', test_dataset.shape)
 
-pretrain = True
-num_epoch = 160
-if pretrain is True:
+incremental = True
+if incremental is False:
     (num_samples, num_labels) = train_labels.shape
     feature_size = train_dataset.shape[1]
     num_hidden_rbm = 800
     rbm_lr = 0.01
     batch_size = 10
+    num_epoch = 120
     num_steps = ceil(train_dataset.shape[0] / batch_size * num_epoch)
     rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
                                      batch_size, trans_func=tf.nn.sigmoid,
@@ -61,10 +60,10 @@ if pretrain is True:
     tf.reset_default_graph()
     input_layer = Input(shape=(train_dataset.shape[1], ), name='input')
     h1 = Dense(num_hidden_rbm, activation='sigmoid', name='h1')(input_layer)
-    h1 = Dropout(0.9)(h1)
-    h2 = Dense(480, activation='relu', name='h2')(h1)
+    h1 = Dropout(0.8)(h1)
+    h2 = Dense(480, activation='sigmoid', name='h2')(h1)
     sm = Dense(num_labels, activation='softmax', name='output')(h2)
-    mlp = Model(inputs=input_layer, outputs=sm)
+    mlp = Model(inputs=input_layer, outputs=sm, name='rbm_mlp')
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
     mlp.summary()
@@ -72,25 +71,28 @@ if pretrain is True:
 else:
     mlp = load_model(mlp_path)
 
-hist = mlp.fit(train_dataset, train_labels,
-               batch_size=80, epochs=num_epoch, verbose=1,
+num_epoch = 100
+tail = 60
+batch_size = 80
+weights = {0: 0.05, 1: 0.15, 2: 0.05, 3: 0.6, 4: 0.15}
+hist = mlp.fit(train_dataset, train_labels, batch_size, num_epoch,
+               verbose=1, class_weight=weights,
                validation_data=(test_dataset, test_labels))
-output = open(data_dir + 'Runs%d.pkl' % num_epoch, 'wb')
-pickle.dump(hist.history, output)
-output.close()
-if pretrain is True:
-    score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
-    print('%s = %s' % (mlp.metrics_names, score))
-else:
-    avg_train = np.mean(hist.history['acc'])
-    avg_test = np.mean(hist.history['val_acc'])
-    std_train = np.std(hist.history['acc'])
-    std_test = np.std(hist.history['val_acc'])
-    print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
-    print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
+score = mlp.evaluate(test_dataset, test_labels, test_dataset.shape[0])
+print('Final %s = %s' % (mlp.metrics_names, score))
+avg_train = np.mean(hist.history['acc'][tail:])
+avg_test = np.mean(hist.history['val_acc'][tail:])
+std_train = np.std(hist.history['acc'][tail:])
+std_test = np.std(hist.history['val_acc'][tail:])
+print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
 
 predictions = mlp.predict(train_dataset)
 measure_prediction(predictions, train_labels, data_dir, 'Train')
 predictions = mlp.predict(test_dataset)
 measure_prediction(predictions, test_labels, data_dir, 'Test')
+
+output = open(data_dir + 'Runs%d.pkl' % num_epoch, 'wb')
+pickle.dump(hist.history, output)
+output.close()
 mlp.save(mlp_path)

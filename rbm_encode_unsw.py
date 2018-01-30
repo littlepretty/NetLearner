@@ -43,8 +43,7 @@ if pretrain is True:
     rbm = RestrictedBoltzmannMachine(feature_size, num_hidden_rbm,
                                      batch_size, trans_func=tf.nn.sigmoid,
                                      num_labels=num_labels, dirname=data_dir)
-    rbm.train_with_labels(train_dataset, train_labels,
-                          int(num_steps),
+    rbm.train_with_labels(train_dataset, train_labels, int(num_steps),
                           valid_dataset, rbm_lr)
     test_loss = rbm.calc_reconstruct_loss(test_dataset)
     print("Testset reconstruction error: %f" % test_loss)
@@ -75,7 +74,7 @@ else:
 hist = mlp.fit(train_dataset, train_labels,
                batch_size=80, epochs=num_epoch, verbose=1,
                validation_data=(test_dataset, test_labels))
-output = open(data_dir + 'Runs%d.pkl' % (num_epoch), 'wb')
+output = open(data_dir + 'Runs%d.pkl' % num_epoch, 'wb')
 pickle.dump(hist.history, output)
 output.close()
 if pretrain is True:
