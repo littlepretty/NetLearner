@@ -7,8 +7,8 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-import logging
 import os
+from math import ceil
 from sklearn.preprocessing import MinMaxScaler
 from preprocess.nslkdd import get_feature_names, get_categorical_values
 from preprocess.nslkdd import attack_category_map
@@ -50,7 +50,6 @@ def process_dataset(fname, output_path):
     data = df_data.drop('difficulty', axis=1)
     labels = df_data['traffic'].apply(lambda x: attack_category_map[x])
     data = data.drop('traffic', axis=1)
-
     print('Raw dataset shape', data.shape)
     print('Raw label shape', labels.shape)
 
@@ -80,7 +79,6 @@ def process_dataset(fname, output_path):
     combined = pd.DataFrame(temp, labels.index.tolist(), columns)
     save = pd.concat([combined, labels], axis=1)
     save.to_csv(output_path, index=False)
-
     return columns + ['label']
 
 
@@ -110,19 +108,20 @@ def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
     train_ib, _ = input_builder(train_filename, columns)
     test_ib, ohe = input_builder(test_filename, columns)
     history = {'train': [], 'test': []}
+    num_samples = ohe.shape[0]
     for i in range(num_epochs):
-        m.train(input_fn=train_ib)
+        m.train(input_fn=train_ib, steps=ceil(num_samples / batch_size))
         results = m.evaluate(train_ib)
         history['train'].append(results)
-        logger.info('******   Train performance   ******')
+        print('******   Train performance   ******')
         for key in results:
-            logger.info("%s: %s" % (key, results[key]))
+            print("%s: %s" % (key, results[key]))
 
         results = m.evaluate(input_fn=test_ib)
         history['test'].append(results)
-        logger.info('******   Test performance   ******')
+        print('******   Test performance   ******')
         for key in results:
-            logger.info("%s: %s" % (key, results[key]))
+            print("%s: %s" % (key, results[key]))
 
     predictions = np.zeros_like(ohe)
     for (i, x) in enumerate(list(m.predict(test_ib))):
@@ -201,14 +200,16 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 120
-batch_size = 100
+num_epochs = 200
+tail = 160
+batch_size = 120
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
-
+class_weights = {'normal': 0.15, 'probe': 0.2,
+                 'dos': 0.15, 'u2r': 0.3, 'r2l': 0.2}
 scaler = MinMaxScaler()
 scaler_fitted = False
-
+"""
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('WD-NSLKDD')
 hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
@@ -216,7 +217,7 @@ formatter = logging.Formatter('%(asctime)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
-
+"""
 columns = process_dataset(train_filename, train_path)
 process_dataset(test_filename, test_path)
 hist = train_and_eval(model_dir, 'WnD', columns, train_path, test_path)
@@ -238,10 +239,10 @@ for e in epoch_list:
 """
 train_accu = [x['accuracy'] for x in hist['train']]
 test_accu = [x['accuracy'] for x in hist['test']]
-avg_train = np.mean(train_accu)
-avg_test = np.mean(test_accu)
-std_train = np.std(train_accu)
-std_test = np.std(test_accu)
+avg_train = np.mean(train_accu[tail:])
+avg_test = np.mean(test_accu[tail:])
+std_train = np.std(train_accu[tail:])
+std_test = np.std(test_accu[tail:])
 print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
 print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
 

@@ -4,11 +4,12 @@ from __future__ import print_function
 from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from preprocess.unsw import get_feature_names, discovery_feature_volcabulary
 from preprocess.unsw import generate_header, discovery_discrete_range
+from netlearner.utils import measure_prediction
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-import logging
+# import logging
 import pickle
 import os
 
@@ -34,7 +35,7 @@ def build_model(model_dir, model_type):
     return m
 
 
-def process_dataset(filename, quantile, output_path):
+def process_dataset(filename, output_path):
     global scaler_fitted, transformer_fitted
     print('dealing with %s' % filename)
     df = pd.read_csv(filename, names=CSV_COLUMNS, sep=',',
@@ -53,7 +54,7 @@ def process_dataset(filename, quantile, output_path):
     full_columns = symbolic_names + continuous_names + discrete_names
     combined = np.concatenate((symbolic, normalized), axis=1)
 
-    if quantile:
+    if len(quantile_names) > 0:
         if transformer_fitted is False:
             transformer.fit(numeric)
             transformer_fitted = True
@@ -66,7 +67,6 @@ def process_dataset(filename, quantile, output_path):
                                index=labels.index.tolist())
     temp = pd.concat([combined_df, labels], axis=1)
     temp.to_csv(output_path, index=False)
-
     return full_columns + ['label']
 
 
@@ -80,38 +80,50 @@ def input_builder(filename, full_columns):
                      skipinitialspace=True, skiprows=1,
                      engine='python', dtype=types)
     labels = df['label'].astype(int)
+    labels_ohe = np.zeros((labels.shape[0], 2))
+    for (i, x) in enumerate(labels):
+        labels_ohe[i][x] = 1.0
+
     dataset = df.drop('label', axis=1)
     print('Raw dataset shape:', dataset.shape)
     print('Raw label shape:', labels.shape)
 
-    return tf.estimator.inputs.pandas_input_fn(
-        x=dataset, y=labels, batch_size=128, shuffle=True, num_threads=1)
+    ib = tf.estimator.inputs.pandas_input_fn(x=dataset, y=labels,
+                                             batch_size=128, shuffle=True,
+                                             num_threads=1)
+    return ib, labels_ohe
 
 
 def train_and_eval(model_dir, model_type, train_path, test_path, columns):
     m = build_model(model_dir, model_type)
-    train_ib = input_builder(train_path, columns)
-    test_ib = input_builder(test_path, columns)
+    train_ib, _ = input_builder(train_path, columns)
+    test_ib, ohe = input_builder(test_path, columns)
     history = {'train': [], 'test': []}
     for i in range(num_epochs):
         m.train(input_fn=train_ib)
-
         result = m.evaluate(train_ib)
         history['train'].append(result)
-        logger.info('******   Train performance   ******')
+        print('******   Train performance   ******')
         for key in result:
-            logger.info("%s: %s" % (key, result[key]))
+            print("%s: %s" % (key, result[key]))
 
         result = m.evaluate(test_ib)
         history['test'].append(result)
-        logger.info('******   Test performance   ******')
+        print('******   Test performance   ******')
         for key in result:
-            logger.info("%s: %s" % (key, result[key]))
+            print("%s: %s" % (key, result[key]))
 
+    predictions = np.zeros_like(ohe)
+    for (i, x) in enumerate(list(m.predict(test_ib))):
+        predictions[i][x['class_ids'][0]] = 1.0
+
+    conf_table = measure_prediction(np.array(predictions), ohe, model_dir)
+    history['confusion_table'] = conf_table
+    print(conf_table)
     return history
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 train_filename = 'UNSW/UNSW_NB15_training-set.csv'
 test_filename = 'UNSW/UNSW_NB15_testing-set.csv'
 feature_filename = 'UNSW/feature_names_train_test.csv'
@@ -150,11 +162,10 @@ for name in continuous_names:
 for name in discrete_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns[name] = column
-"""
+
 for name in quantile_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns[name] = column
-"""
 
 # convert discrete features into categorical columns
 discrete_columns = dict()
@@ -185,13 +196,13 @@ for name in ['state', 'service']:
     indicator_columns.append(tf.feature_column.indicator_column(column))
 
 print('indicator columns', len(indicator_columns))
-"""
+
 low_discrete_names = ['trans_depth', 'ct_state_ttl',
                       'ct_flw_http_mthd', 'ct_ftp_cmd']
 for name in low_discrete_names:
     column = discrete_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
-"""
+
 # convert high dimension categorical features to embeddings
 embedding_columns = []
 for (name, column) in symbolic_columns.items():
@@ -216,28 +227,20 @@ deep_columns = indicator_columns + embedding_columns \
 print('#deep components:', len(deep_columns))
 
 model_dir = 'WideDeepModel/UNSW/'
-num_epochs = 160
-batch_size = 40
+num_epochs = 240
+tail = 200
+batch_size = 120
 dropout = 0.2
 
 transformer = QuantileTransformer()
+transformer_fitted = False
 scaler = MinMaxScaler()
 scaler_fitted = False
-transformer_fitted = False
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('WD')
-hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
-formatter = logging.Formatter('%(asctime)s %(message)s')
-hdlr.setFormatter(formatter)
-logger.addHandler(hdlr)
-logger.setLevel(logging.INFO)
 
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-
-columns = process_dataset(train_filename, False, train_path)
-process_dataset(test_filename, False, test_path)
+columns = process_dataset(train_filename, train_path)
+process_dataset(test_filename, test_path)
 hist = train_and_eval(model_dir, 'WnD', train_path, test_path, columns)
 output = open(model_dir + 'Runs%d.pkl' % (num_epochs), 'wb')
 pickle.dump(hist, output)
@@ -257,9 +260,18 @@ for e in epoch_list:
 
         hist[key] += temp[key]
 """
+train_accu = [x['accuracy'] for x in hist['train']]
+test_accu = [x['accuracy'] for x in hist['test']]
+avg_train = np.mean(train_accu[tail:])
+avg_test = np.mean(test_accu[tail:])
+std_train = np.std(train_accu[tail:])
+std_test = np.std(test_accu[tail:])
+print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
+print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
+
 fig, ax1 = plt.subplots()
-ax1.plot([x['accuracy'] for x in hist['train']], 'r--', label='Train')
-ax1.plot([x['accuracy'] for x in hist['test']], 'b:', label='Test')
+ax1.plot(train_accu, 'r--', label='Train')
+ax1.plot(test_accu, 'b:', label='Test')
 ax1.grid(color='k', linestyle=':', linewidth=1)
 ax1.set_ylabel('Accuracy')
 plt.legend()
