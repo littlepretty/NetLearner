@@ -6,7 +6,7 @@ import sys
 
 
 def load_nsl_dataset():
-    nslkdd.generate_dataset(False, False, model_dir)
+    nslkdd.generate_dataset(False, True, model_dir)
     raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
     train_labels = np.load(data_dir + 'train_labels.npy')
     raw_valid_dataset = np.load(data_dir + 'valid_dataset.npy')
@@ -25,7 +25,7 @@ def load_nsl_dataset():
 
 
 def load_unsw_dataset():
-    unsw.generate_dataset(False, model_dir)
+    unsw.generate_dataset(True, model_dir)
     raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
     train_labels = np.load(data_dir + 'train_labels.npy')
     raw_valid_dataset = np.load(data_dir + 'valid_dataset.npy')
@@ -59,7 +59,7 @@ def LinearSVM(train_dataset, train_labels, test_dataset, test_labels):
     train_prediction = clf.predict(train_dataset)
     evaluate(train_prediction, train_labels, 'LinearSVM Train')
     test_prediction = clf.predict(test_dataset)
-    evaluate(test_prediction, train_labels, 'LinearSVM Test')
+    evaluate(test_prediction, test_labels, 'LinearSVM Test')
 
 
 def NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels):
@@ -71,18 +71,18 @@ def NonLinearSVM(train_dataset, train_labels, test_dataset, test_labels):
     train_prediction = clf.predict(train_dataset)
     evaluate(train_prediction, train_labels, 'NonLinearSVM Train')
     test_prediction = clf.predict(test_dataset)
-    evaluate(test_prediction, train_labels, 'NonLinearSVM Test')
+    evaluate(test_prediction, test_labels, 'NonLinearSVM Test')
 
 
 if __name__ == '__main__':
     np.random.seed(5)
     model_dir = 'SVM/'
     if sys.argv[1] == 'unsw':
-        class_weight = {0: 1, 1: 1}
+        class_weight = {0: 1.0, 1: 1.0}
         data_dir = model_dir + 'UNSW/'
         train, train_labels, test, test_labels = load_unsw_dataset()
     else:
-        class_weight = {0: 1, 1: 4, 2: 1, 3: 16, 4: 4}
+        class_weight = {0: 1.0, 1: 4.0, 2: 1.0, 3: 16.0, 4: 4.0}
         data_dir = model_dir + 'NSLKDD/'
         train, train_labels, test, test_labels = load_nsl_dataset()
 
