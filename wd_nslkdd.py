@@ -8,15 +8,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import os
+import logging
 from math import ceil
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, QuantileTransformer
 from preprocess.nslkdd import get_feature_names, get_categorical_values
 from preprocess.nslkdd import attack_category_map
 from netlearner.utils import measure_prediction
 
 
 def build_model(model_dir, model_type):
-    hidden_layers = [800, 480, 256]
+    hidden_layers = [400, 512, 640]
     label_names = label_mapping.keys()
     if model_type == 'wide':
         m = tf.estimator.LinearClassifier(
@@ -55,31 +56,29 @@ def process_dataset(fname, output_path):
 
     numeric = data[continuous_names + discrete_names].as_matrix()
     symbolic = data[symbolic_names].as_matrix()
-    """
-    if transformer_fitted:
-        print('Transformer already fitted')
-        augment = transformer.transform(numeric)
-    else:
-        print('First time fit transformer')
-        transformer.fit(numeric)
-        augment = transformer.transform(numeric)
-        transformer_fitted = True
-    """
-    if scaler_fitted:
-        print('Scaler already fitted')
-        numeric = scaler.transform(numeric)
-    else:
+    if scaler_fitted is False:
         print('First time fit scaler')
         scaler.fit(numeric)
-        numeric = scaler.transform(numeric)
         scaler_fitted = True
 
-    temp = np.concatenate((symbolic, numeric), axis=1)
-    columns = symbolic_names + continuous_names + discrete_names
-    combined = pd.DataFrame(temp, labels.index.tolist(), columns)
-    save = pd.concat([combined, labels], axis=1)
+    normalized = scaler.transform(numeric)
+    full_columns = symbolic_names + continuous_names + discrete_names
+    combined = np.concatenate((symbolic, normalized), axis=1)
+
+    if len(quantile_names) > 0:
+        if transformer_fitted is False:
+            transformer.fit(numeric)
+            transformer_fitted = True
+
+        augment = transformer.transform(numeric)
+        combined = np.concatenate((combined, augment), axis=1)
+        full_columns += quantile_names
+
+    combined_df = pd.DataFrame(combined, columns=full_columns,
+                               index=labels.index.tolist())
+    save = pd.concat([combined_df, labels], axis=1)
     save.to_csv(output_path, index=False)
-    return columns + ['label']
+    return full_columns + ['label']
 
 
 def input_builder(data_file, columns):
@@ -96,8 +95,8 @@ def input_builder(data_file, columns):
     dataset['login'] = dataset['login'].astype(str)
     dataset['guest_login'] = dataset['guest_login'].astype(str)
     dataset['host_login'] = dataset['host_login'].astype(str)
-    # print('Dataset shape', dataset.shape)
-    # print('Label shape', labels.shape)
+    print('Dataset shape', dataset.shape)
+    print('Label shape', labels.shape)
     ib = tf.estimator.inputs.pandas_input_fn(dataset, labels, batch_size,
                                              shuffle=True, num_threads=1)
     return ib, labels_ohe
@@ -105,23 +104,23 @@ def input_builder(data_file, columns):
 
 def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
     m = build_model(model_dir, mtype)
-    train_ib, _ = input_builder(train_filename, columns)
     test_ib, ohe = input_builder(test_filename, columns)
     history = {'train': [], 'test': []}
     num_samples = ohe.shape[0]
     for i in range(num_epochs):
+        train_ib, _ = input_builder(train_filename, columns)
         m.train(input_fn=train_ib, steps=ceil(num_samples / batch_size))
         results = m.evaluate(train_ib)
         history['train'].append(results)
-        print('******   Train performance   ******')
+        logger.info('******   Train performance   ******')
         for key in results:
-            print("%s: %s" % (key, results[key]))
+            logger.info("%s: %s" % (key, results[key]))
 
         results = m.evaluate(input_fn=test_ib)
         history['test'].append(results)
-        print('******   Test performance   ******')
+        logger.info('******   Test performance   ******')
         for key in results:
-            print("%s: %s" % (key, results[key]))
+            logger.info("%s: %s" % (key, results[key]))
 
     predictions = np.zeros_like(ohe)
     for (i, x) in enumerate(list(m.predict(test_ib))):
@@ -133,12 +132,16 @@ def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
     return history
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
     get_feature_names('NSLKDD/feature_names.csv')
 print(symbolic_names)
 print(continuous_names)
 print(discrete_names)
+
+quantile_names = []
+for name in continuous_names + discrete_names:
+    quantile_names.append(name + '_quantile')
 
 # Build wide columns
 protocol = tf.feature_column.categorical_column_with_vocabulary_list(
@@ -160,9 +163,9 @@ base_columns = [protocol, service, flag, land,
                 login, host_login, guest_login]
 cross_columns = [
     tf.feature_column.crossed_column(
-        ['protocol', 'service'], hash_bucket_size=240),
+        ['protocol', 'service'], hash_bucket_size=200),
     tf.feature_column.crossed_column(
-        ['service', 'flag'], hash_bucket_size=800),
+        ['service', 'flag'], hash_bucket_size=480),
     tf.feature_column.crossed_column(
         ['land', 'login', 'host_login', 'guest_login'], hash_bucket_size=8),
     tf.feature_column.crossed_column(
@@ -170,7 +173,7 @@ cross_columns = [
     tf.feature_column.crossed_column(
         ['protocol', 'host_login', 'guest_login'], hash_bucket_size=12),
     tf.feature_column.crossed_column(
-        ['protocol', 'service', 'flag'], hash_bucket_size=2400),
+        ['protocol', 'service', 'flag'], hash_bucket_size=1000),
 ]
 wide_columns = base_columns + cross_columns
 print("size of wide columns", len(wide_columns))
@@ -188,7 +191,7 @@ embedding_columns = [
 ]
 # Build continous columns
 continuous_columns = []
-for name in continuous_names + discrete_names:
+for name in continuous_names + discrete_names + quantile_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns.append(column)
 
@@ -200,16 +203,18 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 200
-tail = 160
-batch_size = 120
+num_epochs = 240
+tail = 200
+batch_size = 40
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 class_weights = {'normal': 0.15, 'probe': 0.2,
                  'dos': 0.15, 'u2r': 0.3, 'r2l': 0.2}
+transformer = QuantileTransformer()
+transformer_fitted = False
 scaler = MinMaxScaler()
 scaler_fitted = False
-"""
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('WD-NSLKDD')
 hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
@@ -217,7 +222,7 @@ formatter = logging.Formatter('%(asctime)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr)
 logger.setLevel(logging.INFO)
-"""
+
 columns = process_dataset(train_filename, train_path)
 process_dataset(test_filename, test_path)
 hist = train_and_eval(model_dir, 'WnD', columns, train_path, test_path)

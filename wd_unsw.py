@@ -9,13 +9,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-# import logging
+import logging
 import pickle
 import os
 
 
 def build_model(model_dir, model_type):
-    hidden_layers = [1024, 512, 256]
+    hidden_layers = [400, 512, 640]
     if model_type == 'wide':
         m = tf.estimator.LinearClassifier(
             model_dir=model_dir, feature_columns=wide_columns)
@@ -87,7 +87,6 @@ def input_builder(filename, full_columns):
     dataset = df.drop('label', axis=1)
     print('Raw dataset shape:', dataset.shape)
     print('Raw label shape:', labels.shape)
-
     ib = tf.estimator.inputs.pandas_input_fn(x=dataset, y=labels,
                                              batch_size=128, shuffle=True,
                                              num_threads=1)
@@ -96,22 +95,22 @@ def input_builder(filename, full_columns):
 
 def train_and_eval(model_dir, model_type, train_path, test_path, columns):
     m = build_model(model_dir, model_type)
-    train_ib, _ = input_builder(train_path, columns)
     test_ib, ohe = input_builder(test_path, columns)
     history = {'train': [], 'test': []}
     for i in range(num_epochs):
+        train_ib, _ = input_builder(train_path, columns)
         m.train(input_fn=train_ib)
         result = m.evaluate(train_ib)
         history['train'].append(result)
-        print('******   Train performance   ******')
+        logger.info('******   Train performance   ******')
         for key in result:
-            print("%s: %s" % (key, result[key]))
+            logger.info("%s: %s" % (key, result[key]))
 
         result = m.evaluate(test_ib)
         history['test'].append(result)
-        print('******   Test performance   ******')
+        logger.info('******   Test performance   ******')
         for key in result:
-            print("%s: %s" % (key, result[key]))
+            logger.info("%s: %s" % (key, result[key]))
 
     predictions = np.zeros_like(ohe)
     for (i, x) in enumerate(list(m.predict(test_ib))):
@@ -133,10 +132,8 @@ upper, lower, small_ranges = discovery_discrete_range(
     [train_filename, test_filename], discrete_names, CSV_COLUMNS)
 
 quantile_names = []
-"""
 for name in continuous_names + discrete_names:
     quantile_names.append(name + '_quantile')
-"""
 
 print(symbolic_names, len(symbolic_names))
 print(continuous_names, len(continuous_names))
@@ -155,15 +152,7 @@ for (name, categorical_values) in symbolic_features.items():
     symbolic_columns[name] = column
 
 continuous_columns = dict()
-for name in continuous_names:
-    column = tf.feature_column.numeric_column(name)
-    continuous_columns[name] = column
-
-for name in discrete_names:
-    column = tf.feature_column.numeric_column(name)
-    continuous_columns[name] = column
-
-for name in quantile_names:
+for name in continuous_names + discrete_names + quantile_names:
     column = tf.feature_column.numeric_column(name)
     continuous_columns[name] = column
 
@@ -178,13 +167,13 @@ for name in small_ranges:
 base_columns = symbolic_columns.values() + discrete_columns.values()
 cross_columns = [
     tf.feature_column.crossed_column(
-        ['proto', 'service'], hash_bucket_size=1600),
+        ['proto', 'service'], hash_bucket_size=1000),
     tf.feature_column.crossed_column(
-        ['proto', 'state'], hash_bucket_size=1200),
+        ['proto', 'state'], hash_bucket_size=1000),
     tf.feature_column.crossed_column(
         ['service', 'state'], hash_bucket_size=200),
     tf.feature_column.crossed_column(
-        ['proto', 'service', 'state'], hash_bucket_size=8000)
+        ['proto', 'service', 'state'], hash_bucket_size=1600)
 ]
 wide_columns = base_columns + cross_columns
 print('#wide components:', len(wide_columns))
@@ -196,13 +185,13 @@ for name in ['state', 'service']:
     indicator_columns.append(tf.feature_column.indicator_column(column))
 
 print('indicator columns', len(indicator_columns))
-
+"""
 low_discrete_names = ['trans_depth', 'ct_state_ttl',
                       'ct_flw_http_mthd', 'ct_ftp_cmd']
 for name in low_discrete_names:
     column = discrete_columns[name]
     indicator_columns.append(tf.feature_column.indicator_column(column))
-
+"""
 # convert high dimension categorical features to embeddings
 embedding_columns = []
 for (name, column) in symbolic_columns.items():
@@ -227,15 +216,23 @@ deep_columns = indicator_columns + embedding_columns \
 print('#deep components:', len(deep_columns))
 
 model_dir = 'WideDeepModel/UNSW/'
-num_epochs = 240
-tail = 200
-batch_size = 120
+num_epochs = 640
+tail = 600
+batch_size = 64
 dropout = 0.2
 
 transformer = QuantileTransformer()
 transformer_fitted = False
 scaler = MinMaxScaler()
 scaler_fitted = False
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('WD-UNSW')
+hdlr = logging.FileHandler(model_dir + 'Runs%d.accu' % num_epochs)
+formatter = logging.Formatter('%(asctime)s %(message)s')
+hdlr.setFormatter(formatter)
+logger.addHandler(hdlr)
+logger.setLevel(logging.INFO)
 
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
