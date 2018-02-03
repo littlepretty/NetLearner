@@ -233,9 +233,9 @@ class Autoencoder(object):
                 batch_loss = self.calc_reconstruct_loss(batch_data)
                 train_loss = self.calc_reconstruct_loss(train_dataset)
                 valid_loss = self.calc_reconstruct_loss(valid_dataset)
-                print("Minibatch(%d cases) loss at step %d: %.6f"
+                print("Minibatch(%d cases) loss at step %d: %s"
                       % (batch_data.shape[0], step, loss))
-                print("kl=%.4f, lr=%s" % (kl, lr))
+                print("kl=%s\nlr=%s" % (kl, lr))
                 print("Batch reconstruction loss: %f" % batch_loss)
                 print("Train reconstruction loss: %f" % train_loss)
                 print("Valid reconstruction loss: %f" % valid_loss)
@@ -263,7 +263,6 @@ class SparseAutoencoder(Autoencoder):
         sparsity_vector = tf.constant(self.sparsity, shape=[self.encode_size],
                                       dtype=tf.float32, name='sparsity_vector')
         # convert average activity to probabilistic distribution
-        activity = tf.reduce_mean(self.encode, axis=0)
         # activity = tf.reshape(activity, [self.encode_size])
         """
         # KL(P, Q) = cross_entropy(P, Q) - entropy(P),
@@ -275,8 +274,11 @@ class SparseAutoencoder(Autoencoder):
                         -tf.log(tf.transpose(sparsity_vector))))
         return tf.subtract(cross_entropy, entropy)
         """
-        logdiv = tf.log(tf.div(sparsity_vector, activity))
-        return tf.reduce_sum(tf.multiply(sparsity_vector, logdiv))
+        activity = tf.reduce_mean(self.encode, axis=0)
+        term1 = -self.sparsity * tf.reduce_mean(tf.log(activity))
+        term2 = -(1.0 - self.sparsity) * tf.reduce_mean(tf.log(1.0 - activity))
+
+        return term1 + term2
 
     def _create_loss_node(self):
         return tf.add(self.reconstruction_loss,
