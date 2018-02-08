@@ -142,16 +142,20 @@ def load_csv(filename, category_maps):
     print('Processing ' + filename)
     numerical_features = list()
     symbolic_features = list()
-    labels = list()
-
+    binary_labels = list()
+    ten_labels = list()
+    attack_category = {"Normal": 0, "Analysis": 1, "Backdoor": 2, "DoS": 3,
+                       "Exploits": 4, "Fuzzers": 5,  "Generic": 6,
+                       "Reconnaissance": 7, "Shellcode": 8, "Worms": 9}
     csv_file = open(filename, 'rb')
     next(csv_file)
     reader = csv.reader(csv_file, delimiter=',')
     for row in reader:
-        row.pop(0)
-        labels.append(row.pop())
+        row.pop(0)  # ignore id
+        binary_labels.append(row.pop())
+        ten_labels.append(attack_category[row.pop()])
 
-        numerical_features.append(row[0:1] + row[4:-1])
+        numerical_features.append(row[0:1] + row[4:])
         row[1] = category_maps['proto'][row[1]]
         row[2] = category_maps['service'][row[2]]
         row[3] = category_maps['state'][row[3]]
@@ -163,18 +167,21 @@ def load_csv(filename, category_maps):
     part2 = np.array(symbolic_features, dtype=int)
     print('Symbolic feature size:', part2.shape)
 
-    bincount = np.bincount(labels)
-    print('Label distribution:', bincount)
+    bincount = np.bincount(binary_labels)
+    print('Binary Label distribution:', bincount)
 
-    labels = np.array(labels, dtype=int)[np.newaxis]
-    labels = labels.T
-    print('Label size:', labels.shape)
+    binary_labels = np.array(binary_labels, dtype=int)[np.newaxis]
+    binary_labels = binary_labels.T
+    print('Binary Label size:', binary_labels.shape)
+    ten_labels = np.array(ten_labels, dtype=int)[np.newaxis]
+    ten_labels = ten_labels.T
+    print('Ten Label size:', ten_labels.shape)
 
     feature_max = np.amax(part2, axis=0)
     feature_min = np.amin(part2, axis=0)
     print('Max of integerized symbolic features', feature_max)
     print('Min of integerized symbolic features', feature_min)
-    return part1, part2, labels
+    return part1, part2, binary_labels, ten_labels
 
 
 def encode_symbolic_feature(train_symbol, test_symbol):
@@ -233,20 +240,26 @@ def split_valid(dataset, labels, percent=0.12):
     return valid_dataset, valid_labels
 
 
-def generate_dataset(one_hot_encode=True, root_dir=''):
+def generate_dataset(binary_label, one_hot_encoding, root_dir=''):
     prefix = 'UNSW/UNSW_NB15_'
     train_name = prefix + 'training-set.csv'
     test_name = prefix + 'testing-set.csv'
     category_maps = discovery_category_map([train_name, test_name])
 
-    num_train, sym_train, train_labels = load_csv(train_name, category_maps)
-    num_test, sym_test, test_labels = load_csv(test_name, category_maps)
+    num_train, sym_train, train_bin_labels, train_ten_labels = \
+        load_csv(train_name, category_maps)
+    num_test, sym_test, test_bin_labels, test_ten_labels = \
+        load_csv(test_name, category_maps)
 
-    if one_hot_encode is True:
+    if one_hot_encoding is True:
         sym_train, sym_test = encode_symbolic_feature(sym_train, sym_test)
 
-    train_labels = encode_labels(train_labels)
-    test_labels = encode_labels(test_labels)
+    if binary_label:
+        train_labels = encode_labels(train_bin_labels)
+        test_labels = encode_labels(test_bin_labels)
+    else:
+        train_labels = encode_labels(train_ten_labels, 10)
+        test_labels = encode_labels(test_ten_labels, 10)
 
     train_traffic = np.concatenate((num_train, sym_train), axis=1)
     test_traffic = np.concatenate((num_test, sym_test), axis=1)
@@ -254,23 +267,23 @@ def generate_dataset(one_hot_encode=True, root_dir=''):
     print('Trainset shape:', train_traffic.shape, train_labels.shape)
     maybe_npsave('%sUNSW/train_dataset' % root_dir, train_traffic)
     maybe_npsave('%sUNSW/train_labels' % root_dir, train_labels,
-                 binary_label=True)
-
+                 binary_label=binary_label)
+    """
     valid_traffic, valid_labels = split_valid(test_traffic, test_labels)
     print('Validset shape:', valid_traffic.shape, valid_labels.shape)
     maybe_npsave('%sUNSW/valid_dataset' % root_dir, valid_traffic)
     maybe_npsave('%sUNSW/valid_labels' % root_dir, valid_labels,
-                 binary_label=True)
-
+                 binary_label=binary_label)
+    """
     print('Testset shape:', test_traffic.shape, test_labels.shape)
     maybe_npsave('%sUNSW/test_dataset' % root_dir, test_traffic)
     maybe_npsave('%sUNSW/test_labels' % root_dir, test_labels,
-                 binary_label=True)
+                 binary_label=binary_label)
 
 
 if __name__ == '__main__':
     # generate_dataset(True)
-    generate_dataset(False)
+    generate_dataset(False, True)
     """
     filenames = ['UNSW/UNSW_NB15_%s-set.csv' % x
                  for x in ['training', 'testing']]
