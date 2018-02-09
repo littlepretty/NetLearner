@@ -44,8 +44,8 @@ def build_model(model_dir):
         linear_feature_columns=wide_columns,
         dnn_feature_columns=deep_columns,
         dnn_hidden_units=hidden_layers,
-        label_vocabulary=label_names,
         dnn_dropout=dropout,
+        label_vocabulary=label_names,
         n_classes=len(label_names))
     print('Hidden units in each layer:%s' % hidden_layers)
     return m
@@ -53,6 +53,7 @@ def build_model(model_dir):
 
 def process_dataset(fname, output_path, split=False):
     global scaler_fitted, transformer_fitted
+    print('Process %s' % fname)
     df_data = pd.read_csv(tf.gfile.Open(fname), names=CSV_COLUMNS, sep=',',
                           skipinitialspace=True, engine='python', skiprows=1)
     data = df_data.drop('difficulty', axis=1)
@@ -85,7 +86,6 @@ def process_dataset(fname, output_path, split=False):
         skf = StratifiedKFold(n_splits=fold)
         X = combined.copy()
         y = np.reshape(labels, (-1, 1))
-        print(X.shape, y.shape)
         i = 0
         for train_index, valid_index in skf.split(X, y):
             train_dataset, valid_dataset = X[train_index], X[valid_index]
@@ -108,6 +108,7 @@ def process_dataset(fname, output_path, split=False):
 
 
 def input_builder(data_file, columns):
+    print('Building input for %s' % data_file)
     df_data = pd.read_csv(tf.gfile.Open(data_file), names=columns,
                           sep=',', skipinitialspace=True,
                           engine='python', skiprows=1)

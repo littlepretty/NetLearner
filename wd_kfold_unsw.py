@@ -14,6 +14,17 @@ import pickle
 import os
 
 
+def test_splitted_data_builder(train_path, test_path):
+    for i in range(fold):
+        train_fold = train_path + '.train_fold%d.csv' % i
+        valid_fold = train_path + '.valid_fold%d.csv' % i
+        train_ib, _ = input_builder(train_fold, columns)
+        valid_ib, _ = input_builder(valid_fold, columns)
+
+    test_ib, ohe = input_builder(test_path, columns)
+    train_ib, _ = input_builder(train_path, columns)
+
+
 def plot_history(train_loss, valid_loss, test_loss, fig_dir):
     fig, ax1 = plt.subplots()
     ln1 = ax1.plot(train_loss, 'r--', label='Train')
@@ -43,8 +54,8 @@ def build_model(model_dir):
         linear_feature_columns=wide_columns,
         dnn_feature_columns=deep_columns,
         dnn_hidden_units=hidden_layers,
-        label_vocabulary=label_names,
         dnn_dropout=dropout,
+        label_vocabulary=label_names,
         n_classes=len(label_names))
     print('Hidden units in each layer:%s' % hidden_layers)
     return m
@@ -52,15 +63,11 @@ def build_model(model_dir):
 
 def process_dataset(filename, output_path, split, binary_class=False):
     global scaler_fitted, transformer_fitted
-    print('dealing with %s' % filename)
+    print('Process %s' % filename)
     df = pd.read_csv(filename, names=CSV_COLUMNS, sep=',',
                      skipinitialspace=True, skiprows=1, engine='python')
-    if binary_class:
-        df = df.drop('attack_cat', axis=1)
-        labels = df['label'].astype(int)
-    else:
-        df = df.drop('label', axis=1)
-        labels = df['attack_cat'].apply(lambda x: label_map[x])
+    labels = df['label'] if binary_class else df['attack_cat']
+    df.drop(['label', 'attack_cat'], axis=1)
 
     numeric = df[continuous_names + discrete_names].as_matrix()
     symbolic = df[symbolic_names].as_matrix()
@@ -82,13 +89,14 @@ def process_dataset(filename, output_path, split, binary_class=False):
         combined = np.concatenate((combined, augment), axis=1)
         full_columns += quantile_names
 
+    print('Raw dataset shape', combined.shape)
+    print('Raw label shape', labels.shape)
     if split is True:
         skf = StratifiedKFold(n_splits=fold)
         X = combined.copy()
         y = np.reshape(labels, (-1, 1))
-        print(X.shape, y.shape)
         i = 0
-        for train_index, valid_index in skf.split(X, y):
+        for train_index, valid_index in skf.split(X, labels):
             train_dataset, valid_dataset = X[train_index], X[valid_index]
             train_labels, valid_labels = y[train_index], y[valid_index]
 
@@ -103,40 +111,37 @@ def process_dataset(filename, output_path, split, binary_class=False):
 
     combined_df = pd.DataFrame(combined, columns=full_columns,
                                index=labels.index.tolist())
-    temp = pd.concat([combined_df, labels], axis=1)
-    temp.to_csv(output_path, index=False)
+    save = pd.concat([combined_df, labels], axis=1)
+    save.to_csv(output_path, index=False)
     return full_columns + ['label']
 
 
 def input_builder(filename, full_columns):
-    print('dealing with %s' % filename)
-    types = dict()
-    for name in discrete_names:
-        types[name] = np.int32
-
+    print('Building input for %s' % filename)
+    dtypes = dict(zip(discrete_names, [np.int32] * len(discrete_names)))
     df = pd.read_csv(filename, names=full_columns, sep=',',
                      skipinitialspace=True, skiprows=1,
-                     engine='python', dtype=types)
-    labels = df['label'].astype(int)
-    labels_ohe = np.zeros((labels.shape[0], 2))
+                     engine='python', dtype=dtypes)
+    labels = df['label'].astype(str)
+    labels_ohe = np.zeros((labels.shape[0], len(label_map)))
     for (i, x) in enumerate(labels):
-        labels_ohe[i][x] = 1.0
+        labels_ohe[i][label_map[x]] = 1.0
 
     dataset = df.drop('label', axis=1)
-    print('Raw dataset shape:', dataset.shape)
-    print('Raw label shape:', labels.shape)
+    print('Dataset shape:', dataset.shape)
+    print('Label shape:', labels.shape)
     ib = tf.estimator.inputs.pandas_input_fn(dataset, labels, batch_size,
                                              shuffle=True, num_threads=1)
     return ib, labels_ohe
 
 
-def train_and_eval(model_dir, model_type, train_path, test_path, columns):
+def train_and_eval(model_dir, train_path, test_path, columns):
     hist = {'train_loss': [], 'valid_loss': [],
             'test_loss': [], 'test_acc': []}
     fold_train_loss, fold_valid_loss = [], []
     for i in range(fold):
-        train_fold = train_filename + '.train_fold%d.csv' % i
-        valid_fold = train_filename + '.valid_fold%d.csv' % i
+        train_fold = train_path + '.train_fold%d.csv' % i
+        valid_fold = train_path + '.valid_fold%d.csv' % i
         m = build_model(model_dir=None)
         train_loss, valid_loss = [], []
         for _ in range(num_epochs):
@@ -157,10 +162,10 @@ def train_and_eval(model_dir, model_type, train_path, test_path, columns):
     print('Optimal #Epochs:', opt_epochs + 1)
     hist['opt_epochs'] = opt_epochs + 1
 
-    test_ib, ohe = input_builder(test_filename, columns)
+    test_ib, ohe = input_builder(test_path, columns)
     m = build_model(None)
     for i in range(num_epochs):
-        train_ib, _ = input_builder(train_filename, columns)
+        train_ib, _ = input_builder(train_path, columns)
         m.train(input_fn=train_ib)
         scores = m.evaluate(test_ib)
         hist['test_loss'].append(scores['average_loss'])
@@ -275,7 +280,7 @@ print('#deep components:', len(deep_columns))
 model_dir = 'WideDeepModel/UNSW/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 4
+num_epochs = 2
 batch_size = 64
 dropout = 0.2
 fold = 3
@@ -283,6 +288,7 @@ transformer = QuantileTransformer()
 transformer_fitted = False
 scaler = MinMaxScaler()
 scaler_fitted = False
+# label_map = {'0': 0, '1': 1}
 label_map = {"Normal": 0, "Backdoor": 1, "Analysis": 2, "Fuzzers": 3,
              "Reconnaissance": 4, "Exploits": 5, "DoS": 6,
              "Shellcode": 7, "Worms": 8, "Generic": 9}
