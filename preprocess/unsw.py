@@ -3,7 +3,7 @@ import csv
 from sets import Set
 import numpy as np
 import pandas
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from netlearner.utils import maybe_npsave
 
 
@@ -144,9 +144,9 @@ def load_csv(filename, category_maps):
     symbolic_features = list()
     binary_labels = list()
     ten_labels = list()
-    attack_category = {"Normal": 0, "Analysis": 1, "Backdoor": 2, "DoS": 3,
-                       "Exploits": 4, "Fuzzers": 5,  "Generic": 6,
-                       "Reconnaissance": 7, "Shellcode": 8, "Worms": 9}
+    attack_category = {"Normal": 0, "Backdoor": 1, "Analysis": 2, "Fuzzers": 3,
+                       "Reconnaissance": 4, "Exploits": 5, "DoS": 6,
+                       "Shellcode": 7, "Worms": 8, "Generic": 9}
     csv_file = open(filename, 'rb')
     next(csv_file)
     reader = csv.reader(csv_file, delimiter=',')
@@ -168,7 +168,9 @@ def load_csv(filename, category_maps):
     print('Symbolic feature size:', part2.shape)
 
     bincount = np.bincount(binary_labels)
-    print('Binary Label distribution:', bincount)
+    print('Binary label distribution:', bincount)
+    bincount = np.bincount(ten_labels)
+    print('Ten label distribution:', bincount)
 
     binary_labels = np.array(binary_labels, dtype=int)[np.newaxis]
     binary_labels = binary_labels.T
@@ -192,7 +194,15 @@ def encode_symbolic_feature(train_symbol, test_symbol):
     encoded_test = encoder.transform(test_symbol).toarray()
     print('Symbolic feature size: ', encoded_train.shape, encoded_test.shape)
     print('One-Hot Encoder info: ', encoder.n_values_)
+    return encoded_train, encoded_test
 
+
+def std_numeric_feature(train_num, test_num):
+    encoder = StandardScaler()
+    encoder.fit(train_num)
+    encoded_train = encoder.transform(train_num)
+    encoded_test = encoder.transform(test_num)
+    print('Numeric feature standard scaled')
     return encoded_train, encoded_test
 
 
@@ -261,6 +271,7 @@ def generate_dataset(binary_label, one_hot_encoding, root_dir=''):
         train_labels = encode_labels(train_ten_labels, 10)
         test_labels = encode_labels(test_ten_labels, 10)
 
+    num_train, num_test = std_numeric_feature(num_train, num_test)
     train_traffic = np.concatenate((num_train, sym_train), axis=1)
     test_traffic = np.concatenate((num_test, sym_test), axis=1)
 

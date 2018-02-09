@@ -132,9 +132,9 @@ attack_category_map = {'normal': 'normal', 'back': 'dos',
                        'sqlattack': 'probe',
                        'worm': 'probe'}
 # If category_map[x] != 0, then x is a type of attack
-label_names = ['normal', 'probe', 'dos', 'u2r', 'r2l']
-category_map = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
-binary_map = {'normal': 0, 'probe': 1, 'dos': 1, 'u2r': 1, 'r2l': 1, 'other': 1}
+label_names = ['normal', 'dos', 'probe', 'u2r', 'r2l']
+category_map = {'normal': 0, 'dos': 1, 'probe': 2, 'u2r': 3, 'r2l': 4}
+binary_map = {'normal': 0, 'dos': 1, 'probe': 1, 'u2r': 1, 'r2l': 1}
 enc = OneHotEncoder()
 
 
