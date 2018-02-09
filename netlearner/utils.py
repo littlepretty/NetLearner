@@ -175,8 +175,8 @@ def sample_prob_dist(prob, rand):
 
 def measure_prediction(predictions, labels, dirname, dataset_name='Test'):
     log = open(dirname + 'confusion_matrix.log', 'a')
-    if labels.shape[1] == 5:
-        log.write("***** 5-Class performance *****\n")
+    if labels.shape[1] > 2:
+        log.write("***** %d-Class performance *****\n" % labels.shape[1])
         accu = accuracy(predictions, labels)
         log.write("%sset accuracy: %f%%\n" % (dataset_name, accu))
         headers = [str(i) for i in range(labels.shape[1])]
