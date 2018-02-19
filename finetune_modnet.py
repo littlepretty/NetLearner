@@ -243,13 +243,13 @@ def shared_models(unsw, nsl, unsw_inputs, nsl_inputs, unsw_hidden, nsl_hidden):
     bn_unsw = BatchNormalization(name='bn_unsw')(h2_unsw)
     bn_nsl = BatchNormalization(name='bn_nsl')(h2_nsl)
 
-    shared_h3 = Dense(unsw_hidden[2], activation='sigmoid', name='sigmoid')
+    shared_h3 = Dense(unsw_hidden[2], activation='sigmoid', name='sigmoid_unsw')
     h3_unsw = shared_h3(bn_unsw)
     h3_nsl = shared_h3(bn_nsl)
     h3_unsw = Dropout(drop_prob)(h3_unsw)
     h3_nsl = Dropout(drop_prob)(h3_nsl)
 
-    shared_sm = Dense(2, activation='softmax', name='output')
+    shared_sm = Dense(2, activation='softmax', name='output_unsw')
     output_unsw = shared_sm(h3_unsw)
     output_nsl = shared_sm(h3_nsl)
 
@@ -275,28 +275,28 @@ def run_main(unsw_config, nsl_config):
                            unsw_config, nsl_config)
     unsw_size, nsl_size = y_unsw.shape[0], y_nsl.shape[0]
     unsw_loss, nsl_loss = [], []
-    for _ in range(num_epochs):
-        num_batch_runs = -(-max(unsw_size, nsl_size) // batch_size)
+    for _ in range(finetune_epochs):
+        num_batch_runs = -(-max(unsw_size, nsl_size) // ft_bs)
         s1, s2 = 0, 0
         for _ in range(num_batch_runs):
-            e1 = min(unsw_size, s1 + batch_size)
+            e1 = min(unsw_size, s1 + ft_bs)
             batch_dict = dict()
             for (key, value) in X_unsw.items():
                 batch_dict[key] = value[s1:e1]
 
-            m1.fit(batch_dict, y_unsw[s1:e1, :], batch_size, 1, verbose=0)
-            s1 = 0 if e1 == unsw_size else s1 + batch_size
+            m1.fit(batch_dict, y_unsw[s1:e1, :], ft_bs, 1, verbose=0)
+            s1 = 0 if e1 == unsw_size else s1 + ft_bs
 
-            e2 = min(nsl_size, s2 + batch_size)
+            e2 = min(nsl_size, s2 + ft_bs)
             batch_dict = dict()
             for (key, value) in X_nsl.items():
                 batch_dict[key] = value[s2:e2]
 
-            m2.fit(batch_dict, y_nsl[s2:e2, :], batch_size, 1, verbose=0)
-            s2 = 0 if e2 == nsl_size else s2 + batch_size
+            m2.fit(batch_dict, y_nsl[s2:e2, :], ft_bs, 1, verbose=0)
+            s2 = 0 if e2 == nsl_size else s2 + ft_bs
 
-        m1.fit(X_unsw, y_unsw, batch_size, 1, verbose=0)
-        m2.fit(X_nsl, y_nsl, batch_size, 1, verbose=0)
+        m1.fit(X_unsw, y_unsw, ft_bs, 1, verbose=0)
+        m2.fit(X_nsl, y_nsl, ft_bs, 1, verbose=0)
         score = m1.evaluate(X_unsw, y_unsw, unsw_size, verbose=0)
         unsw_loss.append(score[0])
         score = m2.evaluate(X_nsl, y_nsl, nsl_size, verbose=0)
@@ -341,6 +341,8 @@ if __name__ == '__main__':
     h_cls = [400]
     num_runs = 30
     num_epochs = 36
+    ft_bs = 20
+    finetune_epochs = 16
     batch_size = 160
     beta = 0.00
     drop_prob = 0.2
@@ -352,7 +354,9 @@ if __name__ == '__main__':
                   'nsl': {'test': [], 'train': []}}
         finetune = {'unsw': {'train': [], 'test': []},
                     'unsw_loss': [], 'nsl_loss': [],
-                    'nsl': {'train': [], 'test': []}}
+                    'nsl': {'train': [], 'test': []},
+                    'finetune_epochs': finetune_epochs,
+                    'finetune_batch_size': ft_bs}
         logger.info('************************************************')
         logger.info('****  Start %d runs with config %s + %s  ****'
                     % (num_runs, unsw_config, nsl_config))
