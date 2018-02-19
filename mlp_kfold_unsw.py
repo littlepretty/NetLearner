@@ -1,7 +1,7 @@
 from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
-# from netlearner.utils import min_max_scale
+from netlearner.utils import min_max_scale
 from netlearner.utils import measure_prediction
 from preprocess import unsw
 from keras.regularizers import l2
@@ -80,11 +80,12 @@ unsw.generate_dataset(True, True, model_dir)
 # raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
 # raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
 # X, _, X_test = min_max_scale(raw_train_dataset, None, raw_test_dataset)
-X = np.load(data_dir + 'train_dataset.npy')
-X_test = np.load(data_dir + 'test_dataset.npy')
+raw_X = np.load(data_dir + 'train_dataset.npy')
+raw_X_test = np.load(data_dir + 'test_dataset.npy')
 y = np.load(data_dir + 'train_labels.npy')
 y_test = np.load(data_dir + 'test_labels.npy')
 y_flatten = np.argmax(y, axis=1)
+X, _, X_test = min_max_scale(raw_X, None, raw_X_test)
 print('Train dataset', X.shape, y.shape, y_flatten.shape)
 print('Test dataset', X_test.shape, y_test.shape)
 
