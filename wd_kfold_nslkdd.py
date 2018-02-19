@@ -178,7 +178,7 @@ def train_and_eval(model_dir, columns, train_filename, test_filename):
     return hist
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0, 1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0, 2'
 CSV_COLUMNS, symbolic_names, continuous_names, discrete_names = \
     get_feature_names('NSLKDD/feature_names.csv')
 print(symbolic_names)
@@ -250,7 +250,7 @@ model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
 fold = 5
-num_epochs = 360
+num_epochs = 240
 batch_size = 64
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}

@@ -61,7 +61,7 @@ def build_model(model_dir):
     return m
 
 
-def process_dataset(filename, output_path, split, binary_class=False):
+def process_dataset(filename, output_path, split):
     global scaler_fitted, transformer_fitted
     print('Process %s' % filename)
     df = pd.read_csv(filename, names=CSV_COLUMNS, sep=',',
@@ -155,6 +155,7 @@ def train_and_eval(model_dir, train_path, test_path, columns):
 
         fold_train_loss.append(train_loss)
         fold_valid_loss.append(valid_loss)
+        print('Train fold %d finished' % i)
 
     hist['train_loss'] = np.mean(fold_train_loss, axis=0)
     hist['valid_loss'] = np.mean(fold_valid_loss, axis=0)
@@ -184,7 +185,7 @@ def train_and_eval(model_dir, train_path, test_path, columns):
     return hist
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 train_filename = 'UNSW/UNSW_NB15_training-set.csv'
 test_filename = 'UNSW/UNSW_NB15_testing-set.csv'
 feature_filename = 'UNSW/feature_names_train_test.csv'
@@ -200,7 +201,7 @@ for name in continuous_names + discrete_names:
 print(symbolic_names, len(symbolic_names))
 print(continuous_names, len(continuous_names))
 print(discrete_names, len(discrete_names))
-# print(quantile_names, len(quantile_names))
+print(quantile_names, len(quantile_names))
 
 header = generate_header(CSV_COLUMNS)
 print('Headers for dataset file:', header)
@@ -280,18 +281,19 @@ print('#deep components:', len(deep_columns))
 model_dir = 'WideDeepModel/UNSW/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 2
+num_epochs = 400
 batch_size = 64
 dropout = 0.2
-fold = 3
+fold = 5
 transformer = QuantileTransformer()
 transformer_fitted = False
 scaler = MinMaxScaler()
 scaler_fitted = False
-# label_map = {'0': 0, '1': 1}
-label_map = {"Normal": 0, "Backdoor": 1, "Analysis": 2, "Fuzzers": 3,
-             "Reconnaissance": 4, "Exploits": 5, "DoS": 6,
-             "Shellcode": 7, "Worms": 8, "Generic": 9}
+label_map = {'0': 0, '1': 1}
+# label_map = {"Normal": 0, "Backdoor": 1, "Analysis": 2, "Fuzzers": 3,
+# "Reconnaissance": 4, "Exploits": 5, "DoS": 6,
+# "Shellcode": 7, "Worms": 8, "Generic": 9}
+binary_class = (len(label_map) == 2)
 columns = process_dataset(train_filename, train_path, split=True)
 process_dataset(test_filename, test_path, split=False)
 hist = train_and_eval(model_dir, train_path, test_path, columns)
