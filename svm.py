@@ -25,17 +25,16 @@ def load_nsl_dataset():
 
 
 def load_unsw_dataset():
-    unsw.generate_dataset(True, model_dir)
+    unsw.generate_dataset(False, True, model_dir)
     raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
     train_labels = np.load(data_dir + 'train_labels.npy')
-    raw_valid_dataset = np.load(data_dir + 'valid_dataset.npy')
     raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
     test_labels = np.load(data_dir + 'test_labels.npy')
     # train_dataset, valid_dataset, test_dataset = min_max_normalize(
     #    raw_train_dataset, raw_valid_dataset, raw_test_dataset)
     # print('Min-Max normalizing dataset')
-    train_dataset, valid_dataset, test_dataset = standard_scale(
-        raw_train_dataset, raw_valid_dataset, raw_test_dataset)
+    train_dataset, _, test_dataset = standard_scale(raw_train_dataset,
+                                                    None, raw_test_dataset)
     print('Mean normalizing dataset')
     print('Training set', train_dataset.shape, train_labels.shape)
     print('Test set', test_dataset.shape, test_labels.shape)
@@ -78,11 +77,11 @@ if __name__ == '__main__':
     np.random.seed(5)
     model_dir = 'SVM/'
     if sys.argv[1] == 'unsw':
-        class_weight = {0: 1.0, 1: 1.0}
+        class_weight = None  # {0: 1.0, 1: 1.0}
         data_dir = model_dir + 'UNSW/'
         train, train_labels, test, test_labels = load_unsw_dataset()
     else:
-        class_weight = {0: 1.0, 1: 4.0, 2: 1.0, 3: 16.0, 4: 4.0}
+        class_weight = {0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0}
         data_dir = model_dir + 'NSLKDD/'
         train, train_labels, test, test_labels = load_nsl_dataset()
 
