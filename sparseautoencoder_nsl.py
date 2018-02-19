@@ -3,7 +3,6 @@ import numpy as np
 from netlearner.utils import min_max_scale, measure_prediction
 from netlearner.utils import permutate_dataset
 from preprocess.nslkdd import generate_dataset
-from math import ceil
 from keras.models import Model, load_model
 from keras.layers import Input, Dense, Dropout
 # from keras import regularizers
@@ -37,8 +36,6 @@ if incremental is False:
     num_samples, num_classes = train_labels.shape
     feature_size = train_dataset.shape[1]
     encoder_size = 800
-    init_lr = 0.01
-    num_steps = ceil(num_samples / batch_size * num_epoch)
 
     X = Input(shape=(feature_size, ), name='input')
     # add a Dense layer with a L1 activity regularizer
