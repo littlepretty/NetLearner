@@ -16,30 +16,41 @@ from preprocess.nslkdd import attack_category_map
 from netlearner.utils import measure_prediction
 
 
-def build_model(model_dir, model_type):
-    hidden_layers = [400, 512, 640]
-    label_names = label_mapping.keys()
-    if model_type == 'wide':
-        m = tf.estimator.LinearClassifier(
-            model_dir=model_dir, feature_columns=wide_columns)
-    elif model_type == 'deep':
-        m = tf.estimator.DNNClassifier(
-            model_dir=model_dir,
-            feature_columns=deep_columns,
-            hidden_units=hidden_layers,
-            label_vocabulary=label_names,
-            dnn_dropout=dropout,
-            n_classes=len(label_names))
-    else:
-        m = tf.estimator.DNNLinearCombinedClassifier(
-            model_dir=model_dir,
-            linear_feature_columns=wide_columns,
-            dnn_feature_columns=deep_columns,
-            dnn_hidden_units=hidden_layers,
-            label_vocabulary=label_names,
-            dnn_dropout=dropout,
-            n_classes=len(label_names))
+def plot_history(train_loss, valid_loss, test_loss, fig_dir):
+    fig, ax1 = plt.subplots()
+    ln1 = ax1.plot(train_loss, 'r--', label='Train')
+    if len(valid_loss) == 0:
+        valid_loss = [0.0] * len(train_loss)
 
+    ln2 = ax1.plot(valid_loss, 'b:', label='Valid')
+    ax1.set_ylabel('Train/Valid Loss', color='r')
+
+    ax2 = ax1.twinx()
+    ln3 = ax2.plot(test_loss, 'g-.', label='Test')
+    ax2.set_ylabel('Test Loss', color='g')
+
+    lns = ln1 + ln2 + ln3
+    labels = [l.get_label() for l in lns]
+    ax1.legend(lns, labels, loc='upper left')
+
+    ax1.grid(color='k', linestyle=':', linewidth=1)
+    ax2.grid(color='k', linestyle=':', linewidth=1)
+    fig.tight_layout()
+    plt.savefig(fig_dir + 'history.pdf', format='pdf')
+    plt.close()
+
+
+def build_model(model_dir, model_type):
+    hidden_layers = [800, 480]
+    label_names = label_mapping.keys()
+    m = tf.estimator.DNNLinearCombinedClassifier(
+        model_dir=model_dir,
+        linear_feature_columns=wide_columns,
+        dnn_feature_columns=deep_columns,
+        dnn_hidden_units=hidden_layers,
+        label_vocabulary=label_names,
+        dnn_dropout=dropout,
+        n_classes=len(label_names))
     print('Hidden units in each layer:%s' % hidden_layers)
     return m
 
@@ -105,30 +116,41 @@ def input_builder(data_file, columns):
 def train_and_eval(model_dir, mtype, columns, train_filename, test_filename):
     m = build_model(model_dir, mtype)
     test_ib, ohe = input_builder(test_filename, columns)
-    history = {'train': [], 'test': []}
+    history = {'train_loss': [], 'train_acc': [],
+               'test_loss': [], 'test_acc': []}
     num_samples = ohe.shape[0]
     for i in range(num_epochs):
         train_ib, _ = input_builder(train_filename, columns)
         m.train(input_fn=train_ib, steps=ceil(num_samples / batch_size))
         results = m.evaluate(train_ib)
-        history['train'].append(results)
+        history['train_loss'].append(results['average_loss'])
+        history['train_acc'].append(results['accuracy'])
         logger.info('******   Train performance   ******')
         for key in results:
             logger.info("%s: %s" % (key, results[key]))
 
         results = m.evaluate(input_fn=test_ib)
-        history['test'].append(results)
+        history['test_loss'].append(results['average_loss'])
+        history['test_acc'].append(results['accuracy'])
         logger.info('******   Test performance   ******')
         for key in results:
             logger.info("%s: %s" % (key, results[key]))
 
+    opt_epochs = np.argmin(history['test_acc'])
+    opt_accu = np.max(history['test_acc'])
+    print('Test accuracy = %s at epoch %d' % (opt_accu, opt_epochs))
+
     predictions = np.zeros_like(ohe)
+    cnt = 0
     for (i, x) in enumerate(list(m.predict(test_ib))):
+        cnt += 1
         predictions[i][x['class_ids'][0]] = 1.0
 
+    print(cnt)
     conf_table = measure_prediction(np.array(predictions), ohe, model_dir)
     history['confusion_table'] = conf_table
     print(conf_table)
+    plot_history(history['train_loss'], [], history['test_loss'], model_dir)
     return history
 
 
@@ -203,9 +225,8 @@ test_filename = 'NSLKDD/KDDTest.csv'
 model_dir = 'WideDeepModel/NSLKDD/'
 train_path = model_dir + 'aug_train.csv'
 test_path = model_dir + 'aug_test.csv'
-num_epochs = 240
-tail = 200
-batch_size = 40
+num_epochs = 2
+batch_size = 64
 dropout = 0.2
 label_mapping = {'normal': 0, 'probe': 1, 'dos': 2, 'u2r': 3, 'r2l': 4}
 class_weights = {'normal': 0.15, 'probe': 0.2,
@@ -242,39 +263,3 @@ for e in epoch_list:
     hist['train'] += temp['train']
     hist['test'] += temp['test']
 """
-train_accu = [x['accuracy'] for x in hist['train']]
-test_accu = [x['accuracy'] for x in hist['test']]
-avg_train = np.mean(train_accu[tail:])
-avg_test = np.mean(test_accu[tail:])
-std_train = np.std(train_accu[tail:])
-std_test = np.std(test_accu[tail:])
-print('Avg Train Accu: %.6f +/- %.6f' % (avg_train, std_train))
-print('Avg Test Accu: %.6f +/ %.6f' % (avg_test, std_test))
-
-fig, ax1 = plt.subplots()
-ax1.plot(train_accu, 'r--')
-ax1.set_ylabel('Trainset', color='r')
-ax1.tick_params('y', colors='r')
-ax2 = ax1.twinx()
-ax2.plot(test_accu, 'b:')
-ax2.set_ylabel('Testset', color='b')
-ax2.tick_params('y', colors='b')
-ax1.grid(color='k', linestyle=':', linewidth=1)
-ax2.grid(color='k', linestyle=':', linewidth=1)
-fig.tight_layout()
-plt.savefig(model_dir + 'accu_%d.pdf' % num_epochs, format='pdf')
-plt.close()
-
-fig, ax1 = plt.subplots()
-ax1.plot([x['average_loss'] for x in hist['train']], 'r--')
-ax1.set_ylabel('Trainset', color='r')
-ax1.tick_params('y', colors='r')
-ax2 = ax1.twinx()
-ax2.plot([x['average_loss'] for x in hist['test']], 'b:')
-ax2.set_ylabel('Testset', color='b')
-ax2.tick_params('y', colors='b')
-ax1.grid(color='k', linestyle=':', linewidth=1)
-ax2.grid(color='k', linestyle=':', linewidth=1)
-fig.tight_layout()
-plt.savefig(model_dir + 'loss_%d.pdf' % num_epochs, format='pdf')
-plt.close()
