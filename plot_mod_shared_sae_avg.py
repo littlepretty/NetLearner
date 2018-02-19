@@ -12,12 +12,12 @@ def autolabel(rects):
                 '%.2f' % height, ha='center', va='bottom')
 
 
-print('python %s num_runs U if_plot' % sys.argv[0])
+print('python %s num_runs U if_plot_type' % sys.argv[0])
 num_runs = int(sys.argv[1])
 U = int(sys.argv[2])
 if_plot = str(sys.argv[3])
 
-f = open('SharedAutoEncoder/result_runs%s_U%d.pkl' % (num_runs, U), 'rb')
+f = open('SharedAutoEncoder/result_runs%d_U%d.pkl' % (num_runs, U), 'rb')
 data = pickle.load(f)
 f.close()
 ae_unsw_train = data['ae']['unsw']['train']
