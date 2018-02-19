@@ -258,6 +258,11 @@ def get_batch(train_dataset, train_labels, step, batch_size):
     return batch_data, batch_labels
 
 
+def get_random_batch(dataset, labels, batch_size):
+    num_rows = dataset.shape[0]
+    indices = np.random.choice(range(num_rows), batch_size, False)
+    return dataset[indices, :], labels[indices, :]
+
 def next_batch(dataset, step, batch_size):
     offset = int(batch_size * step) % dataset.shape[0]
     end = int(offset + batch_size) % dataset.shape[0]

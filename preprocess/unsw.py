@@ -264,14 +264,14 @@ def generate_dataset(binary_label, one_hot_encoding, root_dir=''):
     if one_hot_encoding is True:
         sym_train, sym_test = encode_symbolic_feature(sym_train, sym_test)
 
-    if binary_label:
+    if binary_label is True:
         train_labels = encode_labels(train_bin_labels)
         test_labels = encode_labels(test_bin_labels)
     else:
         train_labels = encode_labels(train_ten_labels, 10)
         test_labels = encode_labels(test_ten_labels, 10)
 
-    num_train, num_test = std_numeric_feature(num_train, num_test)
+    # num_train, num_test = std_numeric_feature(num_train, num_test)
     train_traffic = np.concatenate((num_train, sym_train), axis=1)
     test_traffic = np.concatenate((num_test, sym_test), axis=1)
 
