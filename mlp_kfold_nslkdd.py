@@ -28,7 +28,7 @@ def build_model():
         sm = Activation('softmax')(sm)
         mlp = Model(inputs=il, outputs=sm, name='mlp')
 
-    mlp = multi_gpu_model(mlp, gpus=2)
+    mlp = multi_gpu_model(mlp, gpus=4)
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
     mlp.summary()
@@ -37,8 +37,8 @@ def build_model():
 
 def plot_history(train_loss, valid_loss, test_loss, fig_dir):
     fig, ax1 = plt.subplots()
-    ln1 = ax1.plot(train_loss, 'r--', label='Train')
-    ln2 = ax1.plot(valid_loss, 'b:', label='Valid')
+    ln1 = ax1.plot(train_loss / (fold - 1.0), 'r--', label='Trainset')
+    ln2 = ax1.plot(valid_loss, 'b:', label='Validset')
     ax1.set_ylabel('Train/Valid Loss', color='r')
 
     ax2 = ax1.twinx()
@@ -56,17 +56,17 @@ def plot_history(train_loss, valid_loss, test_loss, fig_dir):
     plt.close()
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1,2,3"
 model_dir = 'KerasMLP/'
 data_dir = model_dir + 'NSLKDD/'
 
 batch_size = 64
 keep_prob = 0.80
 num_epochs = 120
-beta = 0.00
+beta = 0.0000
 hidden_size = [800, 480]
 fold = 5
-weights = {0: 1.0, 1: 3.0, 2: 1.0, 3: 8.0, 4: 3.0}
+weights = None  # {0: 1.0, 1: 3.0, 2: 1.0, 3: 8.0, 4: 3.0}
 
 nslkdd.generate_dataset(False, True, model_dir)
 raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
@@ -83,7 +83,7 @@ feature_size = X.shape[1]
 skf = StratifiedKFold(n_splits=fold)
 hist = {'train_loss': [], 'valid_loss': []}
 train_loss, valid_loss = [], []
-
+train_accu, valid_accu = [], []
 for train_index, valid_index in skf.split(X, y_flatten):
     train_dataset, valid_dataset = X[train_index], X[valid_index]
     train_labels, valid_labels = y[train_index], y[valid_index]
@@ -95,9 +95,15 @@ for train_index, valid_index in skf.split(X, y_flatten):
     print('Submodel test score: %s = %s' % (mlp.metrics_names, score))
     train_loss.append(history.history['loss'])
     valid_loss.append(history.history['val_loss'])
+    train_accu.append(history.history['acc'])
+    valid_accu.append(history.history['val_acc'])
+
 
 hist['train_loss'] = np.mean(train_loss, axis=0)
 hist['valid_loss'] = np.mean(valid_loss, axis=0)
+hist['train_accu'] = np.mean(train_accu, axis=0)
+hist['valid_accu'] = np.mean(valid_accu, axis=0)
+
 opt_epochs = np.argmin(hist['valid_loss'])
 print('Optimal #Epochs:', opt_epochs + 1)
 hist['opt_epochs'] = opt_epochs + 1

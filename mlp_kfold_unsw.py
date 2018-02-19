@@ -31,7 +31,7 @@ def build_model():
         sm = Dense(num_classes, activation='softmax', name='output')(h2)
         mlp = Model(inputs=il, outputs=sm, name='mlp')
 
-    mlp = multi_gpu_model(mlp, gpus=2)
+    mlp = multi_gpu_model(mlp, gpus=4)
     mlp.compile(optimizer='adam', loss='categorical_crossentropy',
                 metrics=['accuracy'])
     mlp.summary()
@@ -59,13 +59,13 @@ def plot_history(train_loss, valid_loss, test_loss, fig_dir):
     plt.close()
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = "2, 3"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0, 1, 2, 3"
 model_dir = 'KerasMLP/'
 data_dir = model_dir + 'UNSW/'
 batch_size = 64
-keep_prob = 1.0
-num_epochs = 360
-beta = 0.00
+keep_prob = 0.8
+num_epochs = 160
+beta = 0.0001
 freq = {"Normal": 0.3194, "Backdoor": 0.01, "Analysis": 0.114,
         "Fuzzers": 0.1037, "Reconnaissance": 0.0598, "Exploits": 0.1904,
         "DoS": 0.0699, "Shellcode": 0.0065,
@@ -73,10 +73,10 @@ freq = {"Normal": 0.3194, "Backdoor": 0.01, "Analysis": 0.114,
 weights = {0: 1.0, 1: 8.0, 2: 3.0, 3: 3.0, 4: 8.0,
            5: 3.0, 6: 8.0, 7: 16.0, 8: 16.0, 9: 3.0}
 weights = None
-hidden_size = [800, 640, 480]
+hidden_size = [800, 480]
 fold = 5
 
-unsw.generate_dataset(False, True, model_dir)
+unsw.generate_dataset(True, True, model_dir)
 # raw_train_dataset = np.load(data_dir + 'train_dataset.npy')
 # raw_test_dataset = np.load(data_dir + 'test_dataset.npy')
 # X, _, X_test = min_max_scale(raw_train_dataset, None, raw_test_dataset)
@@ -118,7 +118,6 @@ history = mlp.fit(X, y, batch_size, num_epochs,
                   validation_data=(X_test, y_test))
 predicted = mlp.predict(X_test, X_test.shape[0])
 measure_prediction(predicted, y_test, data_dir, 'Test')
-
 hist['test_loss'] = history.history['val_loss']
 hist['test_acc_report'] = history.history['val_acc'][opt_epochs]
 hist['test_acc'] = history.history['val_acc']
